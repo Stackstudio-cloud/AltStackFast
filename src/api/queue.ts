@@ -1,25 +1,10 @@
-import { Queue, Worker, Job } from 'bullmq';
-import { Redis } from 'ioredis';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Redis connection
-const redis = new Redis(process.env.UPSTASH_REDIS_REST_URL || 'redis://localhost:6379');
-
-// Queue for analysis jobs
-export const analysisQueue = new Queue('analysis', {
-  connection: redis,
-  defaultJobOptions: {
-    removeOnComplete: 10,
-    removeOnFail: 5,
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 2000,
-    },
-  },
-});
+// In-memory job storage for Week 2 PoC
+const jobs = new Map<string, any>();
+let jobCounter = 0;
 
 // Job types
 export interface AnalysisJobData {
@@ -46,6 +31,38 @@ export interface AnalysisJobResult {
   };
 }
 
+// Mock queue for Week 2 PoC
+export const analysisQueue = {
+  add: async (name: string, data: AnalysisJobData, options?: any) => {
+    const jobId = `job_${++jobCounter}`;
+    const job = {
+      id: jobId,
+      name,
+      data,
+      status: 'waiting',
+      createdAt: new Date(),
+      priority: options?.priority || 2,
+    };
+    jobs.set(jobId, job);
+    return { id: jobId };
+  },
+  getJob: async (jobId: string) => {
+    return jobs.get(jobId);
+  },
+  getWaiting: async () => {
+    return Array.from(jobs.values()).filter(job => job.status === 'waiting');
+  },
+  getActive: async () => {
+    return Array.from(jobs.values()).filter(job => job.status === 'active');
+  },
+  getCompleted: async () => {
+    return Array.from(jobs.values()).filter(job => job.status === 'completed');
+  },
+  getFailed: async () => {
+    return Array.from(jobs.values()).filter(job => job.status === 'failed');
+  },
+};
+
 // Queue health check
 export const getQueueHealth = async () => {
   try {
@@ -63,11 +80,12 @@ export const getQueueHealth = async () => {
         failed: failed.length,
       },
       timestamp: new Date().toISOString(),
+      note: 'Using in-memory queue for Week 2 PoC',
     };
   } catch (error) {
     return {
       status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Queue error',
       timestamp: new Date().toISOString(),
     };
   }
@@ -77,7 +95,6 @@ export const getQueueHealth = async () => {
 export const addAnalysisJob = async (data: AnalysisJobData) => {
   const job = await analysisQueue.add('analyze-tool', data, {
     priority: data.priority === 'high' ? 1 : data.priority === 'low' ? 3 : 2,
-    delay: 0,
   });
   
   return {
@@ -89,23 +106,29 @@ export const addAnalysisJob = async (data: AnalysisJobData) => {
 
 // Get job status
 export const getJobStatus = async (jobId: string) => {
-  const job = await analysisQueue.getJob(jobId);
+  const job = jobs.get(jobId);
   
   if (!job) {
     return { status: 'not_found' };
   }
   
-  const state = await job.getState();
-  const progress = await job.progress;
-  const result = job.returnvalue;
-  const failedReason = job.failedReason;
-  
   return {
     jobId,
-    status: state,
-    progress,
-    result,
-    failedReason,
+    status: job.status,
+    progress: job.progress || 0,
+    result: job.result,
+    failedReason: job.failedReason,
     timestamp: new Date().toISOString(),
   };
+};
+
+// Update job status (for worker)
+export const updateJobStatus = (jobId: string, status: string, result?: any, error?: string) => {
+  const job = jobs.get(jobId);
+  if (job) {
+    job.status = status;
+    if (result) job.result = result;
+    if (error) job.failedReason = error;
+    job.updatedAt = new Date();
+  }
 }; 

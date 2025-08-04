@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { firestore } from '../server.js';
 import { toolProfileSchema } from '../../schemas/toolProfile.js';
+import { adminAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -109,6 +110,37 @@ router.get('/:toolId', async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to retrieve tool.",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// Admin endpoint to add a new tool (requires authentication)
+router.post('/', adminAuthMiddleware, async (req, res) => {
+  try {
+    const toolData = req.body;
+    
+    // Validate the incoming data
+    const validatedTool = toolProfileSchema.parse({
+      ...toolData,
+      last_updated: new Date().toISOString(),
+      schema_version: "2025-08-04"
+    });
+
+    // Save to Firestore
+    const docRef = firestore.collection('tools').doc(validatedTool.tool_id);
+    await docRef.set(validatedTool);
+
+    res.status(201).json({
+      success: true,
+      message: "Tool added successfully",
+      data: validatedTool
+    });
+  } catch (error) {
+    console.error("Error adding tool:", error);
+    res.status(400).json({
+      success: false,
+      error: "Failed to add tool.",
       message: error instanceof Error ? error.message : "Unknown error"
     });
   }

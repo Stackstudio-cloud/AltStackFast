@@ -2,41 +2,59 @@ import express from 'express';
 import { Firestore } from '@google-cloud/firestore';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+
+import { adminAuthMiddleware } from './middleware/auth.js';
 import toolsRouter from './routes/tools.js';
 import analyzeRouter from './routes/analyze.js';
-import { getQueueHealth } from './queue.js';
+import mcpRouter from './routes/mcp.js'; // Import the new MCP route
 
-// Load environment variables from .env file
-dotenv.config();
+
+// Load environment variables from .env.local file
+dotenv.config({ path: '.env.local' });
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// --- Security Middleware ---
+app.use(cors()); // Enable Cross-Origin Resource Sharing
+app.use(helmet()); // Set various security headers
 app.use(express.json());
+
+// --- Rate Limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per window
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/v1/', apiLimiter); // Apply rate limiting to all v1 routes
 
 // Initialize Firestore
 // This assumes you have GOOGLE_APPLICATION_CREDENTIALS set in your environment
 export const firestore = new Firestore();
 
-// Mount our routes
+// --- Mount Routes ---
+// Public routes
 app.use('/v1/tools', toolsRouter);
 app.use('/v1/analyze', analyzeRouter);
+app.use('/mcp/v1', mcpRouter); // Use the new MCP route
 
-// Health check endpoint for deployment platforms
+// Admin routes (example of how to protect a route)
+// We'll create a POST /v1/tools route later that will use this
+// app.use('/v1/tools', adminAuthMiddleware, adminToolsRouter);
+
+// Health check endpoint
 app.get('/healthz', (_, res) => res.status(200).send('ok'));
 
-// Queue health check
-app.get('/queue/health', async (_, res) => {
-  try {
-    const health = await getQueueHealth();
-    res.status(200).json(health);
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+// Queue health endpoint - QStash doesn't provide detailed stats
+app.get('/queue/health', (_, res) => {
+  res.json({
+    status: 'healthy',
+    stats: { waiting: 0, active: 0, completed: 0, failed: 0 },
+    timestamp: new Date().toISOString(),
+    note: 'Using QStash for job processing - detailed stats not available'
+  });
 });
 
 // Root endpoint
@@ -54,11 +72,28 @@ app.get('/', (_, res) => {
   });
 });
 
-const PORT = process.env.PORT ?? 8080;
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 8080;
+
+// Add error handling to the server startup
+const server = app.listen(PORT, () => {
   console.log(`🚀 API server running on http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/healthz`);
-  console.log(`🔧 Tools endpoint: http://localhost:${PORT}/v1/tools`);
-  console.log(`⚡ Analyze endpoint: http://localhost:${PORT}/v1/analyze`);
-  console.log(`📈 Queue health: http://localhost:${PORT}/queue/health`);
+  console.log(`🔗 Queue health: http://localhost:${PORT}/queue/health`);
+  console.log(`🛠️ Tools API: http://localhost:${PORT}/v1/tools`);
+  console.log(`🔍 Analysis API: http://localhost:${PORT}/v1/analyze`);
+  console.log(`🤖 MCP API: http://localhost:${PORT}/mcp/v1`);
+  console.log('🔒 Security middleware active (CORS, Helmet, Rate Limiting)');
+});
+
+// Add error handling
+server.on('error', (error) => {
+  console.error('❌ Server error:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
 }); 

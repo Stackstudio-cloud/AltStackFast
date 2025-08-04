@@ -1,85 +1,97 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { addAnalysisJob, getJobStatus } from '../queue.js';
 
 const router = Router();
 
-// Validation schema for analyze request
-const analyzeRequestSchema = z.object({
-  toolId: z.string().min(1),
+// Zod schema for request body validation
+const analyzeBodySchema = z.object({
   url: z.string().url().optional(),
-  description: z.string().optional(),
-  userId: z.string().optional(),
-  priority: z.enum(['low', 'normal', 'high']).default('normal'),
+  tool_name: z.string().min(2).optional(),
+}).refine((data) => data.url || data.tool_name, {
+  message: 'Either a `url` or a `tool_name` must be provided.',
 });
 
-// POST /v1/analyze - Add analysis job to queue
+// The URL of your worker service deployed on Fly.io or another platform.
+// This should be in your .env file.
+const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8081/analyze';
+
 router.post('/', async (req, res) => {
-  try {
-    // Validate request body
-    const validatedData = analyzeRequestSchema.parse(req.body);
-    
-    // Add job to queue
-    const result = await addAnalysisJob(validatedData);
-    
-    res.status(202).json({
-      success: true,
-      message: 'Analysis job queued successfully',
-      data: result,
+  const parseResult = analyzeBodySchema.safeParse(req.body);
+
+  if (!parseResult.success) {
+    return res.status(400).json({ 
+      success: false,
+      error: 'Validation failed',
+      details: parseResult.error.flatten() 
     });
-  } catch (error) {
-    console.error('Error adding analysis job:', error);
-    
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid request data',
-        details: error.errors,
-      });
+  }
+
+  if (!process.env.QSTASH_URL || !process.env.QSTASH_TOKEN) {
+    console.error("QStash environment variables not set.");
+    return res.status(500).json({ 
+      success: false,
+      error: "Queueing service is not configured." 
+    });
+  }
+
+  try {
+                // Publish a message to the QStash topic.
+            // The body of this request is the job payload.
+            // The URL is where QStash will send the job.
+            const qstashResponse = await fetch(`${process.env.QSTASH_URL}/v2/publish/${WORKER_URL}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+        'Content-Type': 'application/json',
+        // Add retry logic. QStash will attempt this 3 times.
+        'Upstash-Retries': '3',
+      },
+      body: JSON.stringify(parseResult.data),
+    });
+
+    if (!qstashResponse.ok) {
+        throw new Error(`QStash API error: ${await qstashResponse.text()}`);
     }
     
-    res.status(500).json({
+    const responseBody = await qstashResponse.json();
+
+    // Respond immediately with "202 Accepted" and the message ID from QStash.
+    res.status(202).json({ 
+      success: true,
+      message: "Analysis job accepted.", 
+      messageId: responseBody.messageId,
+      data: {
+        jobId: responseBody.messageId,
+        status: 'queued',
+        timestamp: new Date().toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error("Failed to publish job to QStash:", error);
+    res.status(500).json({ 
       success: false,
-      error: 'Failed to queue analysis job',
-      message: error instanceof Error ? error.message : 'Unknown error',
+      error: "Could not schedule the analysis job.",
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
 
-// GET /v1/analyze/:jobId - Get job status
-router.get('/:jobId', async (req, res) => {
-  try {
-    const { jobId } = req.params;
-    
-    if (!jobId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Job ID is required',
-      });
+// Keep the job status endpoint for compatibility (though QStash doesn't provide status)
+router.get('/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  
+  res.json({
+    success: true,
+    data: {
+      jobId,
+      status: 'processing', // QStash doesn't provide detailed status
+      progress: 0,
+      result: null,
+      failedReason: null,
+      timestamp: new Date().toISOString(),
+      note: 'QStash-based job - status not available'
     }
-    
-    const status = await getJobStatus(jobId);
-    
-    if (status.status === 'not_found') {
-      return res.status(404).json({
-        success: false,
-        error: 'Job not found',
-        jobId,
-      });
-    }
-    
-    res.status(200).json({
-      success: true,
-      data: status,
-    });
-  } catch (error) {
-    console.error('Error getting job status:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get job status',
-      message: error instanceof Error ? error.message : 'Unknown error',
-    });
-  }
+  });
 });
 
 export default router; 
