@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
+    "moduleResolution": "node",
     "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
@@ -10,5 +11,5 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/App.jsx", "src/main.jsx", "src/index.css"]
 }
