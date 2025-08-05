@@ -1,15 +1,7 @@
 {
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "rootDir": "./src",
-    "outDir": "./dist",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true
-  },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "src/App.jsx", "src/main.jsx", "src/index.css"]
+  "files": [],
+  "references": [
+    { "path": "./packages/schemas" },
+    { "path": "./packages/api" }
+  ]
 }
