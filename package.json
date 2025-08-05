@@ -5,11 +5,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:app": "npm run dev --workspace=app",
     "build:api": "npm run build --workspace=api",
     "build:worker": "npm run build --workspace=worker"
-  },
-  "devDependencies": {
-    "typescript": "^5.1.6"
   }
 }
