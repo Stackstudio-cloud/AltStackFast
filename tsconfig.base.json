@@ -12,7 +12,7 @@
     "baseUrl": ".",
     "paths": {
       "schemas": ["packages/schemas/src"],
-      "api": ["packages/api/src"]
+      "schemas/*": ["packages/schemas/src/*"]
     }
   }
 }
