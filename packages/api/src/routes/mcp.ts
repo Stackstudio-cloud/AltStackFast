@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { firestore } from '../server.js';
-import { toolProfileSchema } from '../../schemas/toolProfile.js';
+import { toolProfileSchema } from 'schemas';
 
 const router = Router();
 
