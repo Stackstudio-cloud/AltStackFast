@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { firestore } from '../server.js';
-import { toolProfileSchema } from 'schemas';
+import { toolProfileSchema } from '@altstackfast/schemas';
 
 const router = Router();
 
