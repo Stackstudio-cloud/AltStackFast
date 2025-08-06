@@ -1,0 +1,45 @@
+import { z } from 'zod';
+export declare const toolProfileSchema: z.ZodObject<{
+    tool_id: z.ZodString;
+    name: z.ZodString;
+    description: z.ZodString;
+    category: z.ZodArray<z.ZodString, "many">;
+    notable_strengths: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    known_limitations: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    output_types: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    integrations: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
+    license: z.ZodOptional<z.ZodNullable<z.ZodString>>;
+    maturity_score: z.ZodOptional<z.ZodNullable<z.ZodNumber>>;
+    last_updated: z.ZodString;
+    schema_version: z.ZodString;
+    requires_review: z.ZodOptional<z.ZodBoolean>;
+}, "strip", z.ZodTypeAny, {
+    tool_id: string;
+    name: string;
+    description: string;
+    category: string[];
+    last_updated: string;
+    schema_version: string;
+    notable_strengths?: string[] | undefined;
+    known_limitations?: string[] | undefined;
+    output_types?: string[] | undefined;
+    integrations?: string[] | undefined;
+    license?: string | null | undefined;
+    maturity_score?: number | null | undefined;
+    requires_review?: boolean | undefined;
+}, {
+    tool_id: string;
+    name: string;
+    description: string;
+    category: string[];
+    last_updated: string;
+    schema_version: string;
+    notable_strengths?: string[] | undefined;
+    known_limitations?: string[] | undefined;
+    output_types?: string[] | undefined;
+    integrations?: string[] | undefined;
+    license?: string | null | undefined;
+    maturity_score?: number | null | undefined;
+    requires_review?: boolean | undefined;
+}>;
+export type ToolProfile = z.infer<typeof toolProfileSchema>;

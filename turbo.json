@@ -9,5 +9,6 @@
       "cache": false,
       "persistent": true
     }
-  }
+  },
+  "globalDependencies": ["tsconfig.json", "tsconfig.base.json"]
 }
