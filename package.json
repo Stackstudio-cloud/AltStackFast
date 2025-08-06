@@ -7,7 +7,9 @@
   "scripts": {
     "build": "turbo run build",
     "vercel-build": "npx turbo run build --filter=@altstackfast/schemas --filter=@altstackfast/api",
-    "dev": "turbo run dev"
+    "dev": "npm run dev --workspace=@altstackfast/app",
+    "dev:api": "npm run dev --workspace=@altstackfast/api",
+    "dev:worker": "npm run dev --workspace=@altstackfast/worker"
   },
   "dependencies": {
     "zod": "^3.22.2",
