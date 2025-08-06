@@ -1,4 +1,4 @@
-// This is the entry point for Vercel
+// This is the main Vercel function
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
