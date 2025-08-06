@@ -35,9 +35,17 @@ const apiLimiter = rateLimit({
 });
 app.use('/v1/', apiLimiter); // Apply rate limiting to all v1 routes
 
-// Initialize Firestore
-// This assumes you have GOOGLE_APPLICATION_CREDENTIALS set in your environment
-export const firestore = new Firestore();
+// Initialize Firestore with error handling
+let firestore: Firestore | null = null;
+try {
+  firestore = new Firestore();
+  console.log('✅ Firestore initialized successfully');
+} catch (error) {
+  console.warn('⚠️ Firestore initialization failed:', error);
+  console.warn('⚠️ Some features may not work without proper Google Cloud credentials');
+}
+
+export { firestore };
 
 // --- Mount Routes ---
 // Public routes
