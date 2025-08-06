@@ -135,7 +135,7 @@ app.post('/analyze', async (req, res) => {
 // Health check endpoint
 app.get('/healthz', (_, res) => res.status(200).send('ok'));
 
-const PORT = process.env.WORKER_PORT ?? 8081;
+const PORT = process.env.WORKER_PORT ?? 8080;
 app.listen(PORT, () => {
   console.log(`🚀 QStash Worker server listening for jobs at http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/healthz`);

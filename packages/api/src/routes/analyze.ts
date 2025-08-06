@@ -53,7 +53,7 @@ router.post('/', async (req, res) => {
         throw new Error(`QStash API error: ${await qstashResponse.text()}`);
     }
     
-    const responseBody = await qstashResponse.json();
+    const responseBody = await qstashResponse.json() as { messageId: string };
 
     // Respond immediately with "202 Accepted" and the message ID from QStash.
     res.status(202).json({ 

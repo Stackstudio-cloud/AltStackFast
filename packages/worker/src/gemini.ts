@@ -71,7 +71,15 @@ export async function callGeminiToAnalyze(textContent: string): Promise<any> {
     throw new Error(`Gemini API request failed with status ${response.status}: ${errorBody}`);
   }
 
-  const result = await response.json();
+  const result = await response.json() as {
+    candidates?: Array<{
+      content: {
+        parts: Array<{
+          text: string;
+        }>;
+      };
+    }>;
+  };
 
   if (result.candidates && result.candidates.length > 0) {
     // The API returns the structured JSON as a string in the 'text' field.

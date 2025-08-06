@@ -11,8 +11,13 @@ import analyzeRouter from './routes/analyze.js';
 import mcpRouter from './routes/mcp.js'; // Import the new MCP route
 
 
-// Load environment variables from .env.local file
-dotenv.config({ path: '.env.local' });
+// Load environment variables - try .env.local first, then fallback to default
+try {
+  dotenv.config({ path: '.env.local' });
+} catch (error) {
+  // If .env.local doesn't exist, load from default locations
+  dotenv.config();
+}
 
 const app = express();
 
@@ -72,28 +77,34 @@ app.get('/', (_, res) => {
   });
 });
 
-const PORT = process.env.PORT || 8080;
+// Export the app for Vercel
+export default app;
 
-// Add error handling to the server startup
-const server = app.listen(PORT, () => {
-  console.log(`🚀 API server running on http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/healthz`);
-  console.log(`🔗 Queue health: http://localhost:${PORT}/queue/health`);
-  console.log(`🛠️ Tools API: http://localhost:${PORT}/v1/tools`);
-  console.log(`🔍 Analysis API: http://localhost:${PORT}/v1/analyze`);
-  console.log(`🤖 MCP API: http://localhost:${PORT}/mcp/v1`);
-  console.log('🔒 Security middleware active (CORS, Helmet, Rate Limiting)');
-});
+// Only start the server if this file is run directly (not imported)
+if (require.main === module) {
+  const PORT = process.env.PORT || 8080;
 
-// Add error handling
-server.on('error', (error) => {
-  console.error('❌ Server error:', error);
-});
+  // Add error handling to the server startup
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 API server running on http://localhost:${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/healthz`);
+    console.log(`🔗 Queue health: http://localhost:${PORT}/queue/health`);
+    console.log(`🛠️ Tools API: http://localhost:${PORT}/v1/tools`);
+    console.log(`🔍 Analysis API: http://localhost:${PORT}/v1/analyze`);
+    console.log(`🤖 MCP API: http://localhost:${PORT}/mcp/v1`);
+    console.log('🔒 Security middleware active (CORS, Helmet, Rate Limiting)');
+  });
 
-process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
-});
+  // Add error handling
+  server.on('error', (error) => {
+    console.error('❌ Server error:', error);
+  });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-}); 
+  process.on('uncaughtException', (error) => {
+    console.error('❌ Uncaught Exception:', error);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+} 

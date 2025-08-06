@@ -24,6 +24,7 @@
     "@types/cors": "^2.8.13",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/node": "^20.4.8",
+    "@types/helmet": "^4.0.0",
     "tsx": "^4.0.0"
   }
 }

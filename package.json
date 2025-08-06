@@ -6,7 +6,11 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "vercel-build": "npx turbo run build --filter=@altstackfast/schemas --filter=@altstackfast/api",
     "dev": "turbo run dev"
+  },
+  "dependencies": {
+    "zod": "^3.22.2"
   },
   "devDependencies": {
     "turbo": "^1.10.12",

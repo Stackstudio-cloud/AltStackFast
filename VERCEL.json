@@ -1,17 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "turbo run build --filter=@altstackfast/api",
-  "outputDirectory": "packages/api/dist",
-  "builds": [
-    {
-      "src": "packages/api/dist/server.js",
-      "use": "@vercel/node"
+  "buildCommand": "npx turbo run build --filter=@altstackfast/schemas --filter=@altstackfast/api",
+  "functions": {
+    "api/index.js": {
+      "runtime": "@vercel/node"
     }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "packages/api/dist/server.js"
-    }
-  ]
+  }
 }

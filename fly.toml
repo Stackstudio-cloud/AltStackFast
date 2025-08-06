@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for altstackfast on 2025-08-06T04:58:46-07:00
+# fly.toml app configuration file generated for altstackfast-proud-surf-1049 on 2025-08-06T06:20:48-07:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'altstackfast'
+app = 'altstackfast-proud-surf-1049'
 primary_region = 'ams'
 
 [build]
