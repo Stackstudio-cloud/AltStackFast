@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npx turbo run build --filter=@altstackfast/schemas --filter=@altstackfast/api",
+  "buildCommand": "npm install && npm run vercel-build",
   "functions": {
     "api/index.js": {
       "runtime": "@vercel/node"
