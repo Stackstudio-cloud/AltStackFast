@@ -127,9 +127,13 @@ router.post('/', adminAuthMiddleware, async (req, res) => {
       schema_version: "2025-08-04"
     });
 
-    // Save to Firestore
-    const docRef = firestore.collection('tools').doc(validatedTool.tool_id);
-    await docRef.set(validatedTool);
+    // Save to Firestore (if available)
+    if (firestore) {
+      const docRef = firestore.collection('tools').doc(validatedTool.tool_id);
+      await docRef.set(validatedTool);
+    } else {
+      console.warn('⚠️ Firestore not available - tool not saved to database');
+    }
 
     res.status(201).json({
       success: true,
