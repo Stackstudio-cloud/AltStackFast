@@ -48,18 +48,15 @@ try {
 export { firestore };
 
 // --- Mount Routes ---
-// Create a parent router for all API endpoints
-const apiRouter = express.Router();
-
-// Public routes
-apiRouter.use('/v1/tools', toolsRouter);
-apiRouter.use('/v1/analyze', analyzeRouter);
+app.use('/v1/tools', toolsRouter);
+app.use('/v1/analyze', analyzeRouter);
+app.use('/mcp/v1', mcpRouter);
 
 // Health check endpoint
-apiRouter.get('/healthz', (_, res) => res.status(200).send('ok'));
+app.get('/healthz', (_, res) => res.status(200).send('ok'));
 
 // Queue health endpoint
-apiRouter.get('/queue/health', (_, res) => {
+app.get('/queue/health', (_, res) => {
   res.json({
     status: 'healthy',
     stats: { waiting: 0, active: 0, completed: 0, failed: 0 },
@@ -68,20 +65,14 @@ apiRouter.get('/queue/health', (_, res) => {
   });
 });
 
-// Root of the API router
-apiRouter.get('/', (_, res) => {
+// Root endpoint for the entire app
+app.get('/', (_, res) => {
   res.json({
     name: 'AltStackFast API',
     version: '1.0.0',
     status: 'running'
   });
 });
-
-// Mount the parent router under /api
-app.use('/api', apiRouter);
-
-// Original MCP route - outside the /api prefix for now if needed, or move it in
-app.use('/mcp/v1', mcpRouter);
 
 // Export the app for Vercel
 export default app;
