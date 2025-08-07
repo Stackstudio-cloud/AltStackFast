@@ -3,11 +3,27 @@
   "pipeline": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
+    },
+    "@altstackfast/app#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"]
+    },
+    "@altstackfast/api#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@altstackfast/worker#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "@altstackfast/schemas#build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
     }
   },
   "globalDependencies": ["tsconfig.json", "tsconfig.base.json"]
