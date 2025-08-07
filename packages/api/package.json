@@ -1,6 +1,7 @@
 {
   "name": "@altstackfast/api",
   "version": "1.0.0",
+  "description": "The API for AltStackFast.",
   "main": "dist/server.js",
   "scripts": {
     "build": "cd ../schemas && npm run build && cd ../api && tsc",
