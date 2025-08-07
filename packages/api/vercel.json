@@ -8,5 +8,8 @@
                 "includeFiles": ["dist/**", "../schemas/dist/**"]
             }
         }
+    ],
+    "routes": [
+        { "src": "/(.*)", "dest": "/" }
     ]
 }
