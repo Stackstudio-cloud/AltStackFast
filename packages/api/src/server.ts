@@ -48,20 +48,18 @@ try {
 export { firestore };
 
 // --- Mount Routes ---
-// Public routes
-app.use('/v1/tools', toolsRouter);
-app.use('/v1/analyze', analyzeRouter);
-app.use('/mcp/v1', mcpRouter); // Use the new MCP route
+// Create a parent router for all API endpoints
+const apiRouter = express.Router();
 
-// Admin routes (example of how to protect a route)
-// We'll create a POST /v1/tools route later that will use this
-// app.use('/v1/tools', adminAuthMiddleware, adminToolsRouter);
+// Public routes
+apiRouter.use('/v1/tools', toolsRouter);
+apiRouter.use('/v1/analyze', analyzeRouter);
 
 // Health check endpoint
-app.get('/healthz', (_, res) => res.status(200).send('ok'));
+apiRouter.get('/healthz', (_, res) => res.status(200).send('ok'));
 
-// Queue health endpoint - QStash doesn't provide detailed stats
-app.get('/queue/health', (_, res) => {
+// Queue health endpoint
+apiRouter.get('/queue/health', (_, res) => {
   res.json({
     status: 'healthy',
     stats: { waiting: 0, active: 0, completed: 0, failed: 0 },
@@ -70,20 +68,20 @@ app.get('/queue/health', (_, res) => {
   });
 });
 
-// Root endpoint
-app.get('/', (_, res) => {
+// Root of the API router
+apiRouter.get('/', (_, res) => {
   res.json({
-    name: 'AltStackFast MCP Server',
+    name: 'AltStackFast API',
     version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      tools: '/v1/tools',
-      analyze: '/v1/analyze',
-      health: '/healthz',
-      queueHealth: '/queue/health'
-    }
+    status: 'running'
   });
 });
+
+// Mount the parent router under /api
+app.use('/api', apiRouter);
+
+// Original MCP route - outside the /api prefix for now if needed, or move it in
+app.use('/mcp/v1', mcpRouter);
 
 // Export the app for Vercel
 export default app;
