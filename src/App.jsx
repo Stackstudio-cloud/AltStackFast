@@ -103,7 +103,7 @@ const App = () => {
   // --- Core "AI Brain" to fetch blueprint ---
   const fetchBlueprintFromAI = async (rawIdea) => {
     setIsLoading(true);
-    const apiKey = ""; // Canvas runtime provides this
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
     const stackContext = JSON.stringify(stackRegistry, null, 2);
     const metaPrompt = `You are a world-class software architect. A user has provided an idea for a web application. You also have access to a database of AI development tools, backends, frontends, and boilerplates.
