@@ -38,7 +38,18 @@ app.use('/v1/', apiLimiter); // Apply rate limiting to all v1 routes
 // Initialize Firestore with error handling
 let firestore: Firestore | null = null;
 try {
-  firestore = new Firestore();
+  let credentials;
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    try {
+      // Try to parse as JSON first (for local dev)
+      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    } catch (e) {
+      // If parsing fails, assume it's a Base64 encoded string (for Vercel)
+      const decodedString = Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'base64').toString('utf-8');
+      credentials = JSON.parse(decodedString);
+    }
+  }
+  firestore = new Firestore({ credentials });
   console.log('✅ Firestore initialized successfully');
 } catch (error) {
   console.warn('⚠️ Firestore initialization failed:', error);
