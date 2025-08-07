@@ -4,6 +4,7 @@
   "description": "The API for AltStackFast.",
   "main": "dist/server.js",
   "scripts": {
+    "postinstall": "cd ../schemas && npm run build",
     "build": "cd ../schemas && npm run build && tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts"
