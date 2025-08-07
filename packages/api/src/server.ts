@@ -47,16 +47,18 @@ try {
 
 export { firestore };
 
+const apiRouter = express.Router();
+
 // --- Mount Routes ---
-app.use('/v1/tools', toolsRouter);
-app.use('/v1/analyze', analyzeRouter);
-app.use('/mcp/v1', mcpRouter);
+apiRouter.use('/v1/tools', toolsRouter);
+apiRouter.use('/v1/analyze', analyzeRouter);
+apiRouter.use('/mcp/v1', mcpRouter);
 
 // Health check endpoint
-app.get('/healthz', (_, res) => res.status(200).send('ok'));
+apiRouter.get('/healthz', (_, res) => res.status(200).send('ok'));
 
 // Queue health endpoint
-app.get('/queue/health', (_, res) => {
+apiRouter.get('/queue/health', (_, res) => {
   res.json({
     status: 'healthy',
     stats: { waiting: 0, active: 0, completed: 0, failed: 0 },
@@ -66,13 +68,15 @@ app.get('/queue/health', (_, res) => {
 });
 
 // Root endpoint for the entire app
-app.get('/', (_, res) => {
+apiRouter.get('/', (_, res) => {
   res.json({
     name: 'AltStackFast API',
     version: '1.0.0',
     status: 'running'
   });
 });
+
+app.use('/api', apiRouter);
 
 // Export the app for Vercel
 export default app;
