@@ -27,5 +27,8 @@
     "@types/node": "^20.4.8",
     "@types/helmet": "^4.0.0",
     "tsx": "^4.0.0"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
