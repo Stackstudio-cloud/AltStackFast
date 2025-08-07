@@ -1,6 +1,9 @@
 {
-      "rewrites": [
-        { "source": "/api/(.*)", "destination": "https://your-api-domain.vercel.app/api/$1" },
-        { "source": "/(.*)", "destination": "/index.html" }
-      ]
-    }
+  "builds": [
+    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
+  ],
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "https://your-api-domain.vercel.app/" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
