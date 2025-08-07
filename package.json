@@ -6,7 +6,7 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "vercel-build": "npx turbo run build",
+    "vercel-build": "npx turbo run build && ls -R packages/app && mkdir public && cp -r packages/app/dist/* public/",
     "dev": "npm run dev --workspace=@altstackfast/app",
     "dev:api": "npm run dev --workspace=@altstackfast/api",
     "dev:worker": "npm run dev --workspace=@altstackfast/worker"
