@@ -7,7 +7,7 @@ function App() {
   const [error, setError] = useState(null)
   const [selectedTool, setSelectedTool] = useState(null)
 
-  const API_URL = import.meta.env.PROD ? '/api' : ''
+  const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : '')
 
   useEffect(() => {
     fetchTools()
@@ -18,10 +18,11 @@ function App() {
       setLoading(true)
       const response = await fetch(`${API_URL}/v1/tools`)
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const text = await response.text()
+        throw new Error(`HTTP ${response.status}: ${text}`)
       }
       const data = await response.json()
-      setTools(data.tools || [])
+      setTools(data.data || data.tools || [])
     } catch (err) {
       console.error('Error fetching tools:', err)
       setError(err.message)
@@ -123,7 +124,7 @@ function App() {
             >
               <div className="flex items-start justify-between mb-4">
                 <h3 className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
-                  {tool.tool_name}
+                  {tool.name || tool.tool_name}
                 </h3>
                 {tool.requires_review && (
                   <span className="px-2 py-1 bg-yellow-600/20 border border-yellow-500/30 rounded text-xs text-yellow-400">
@@ -137,7 +138,7 @@ function App() {
               </p>
 
               <div className="flex flex-wrap gap-2 mb-4">
-                {tool.categories?.slice(0, 3).map((category, index) => (
+                {(tool.category || tool.categories || []).slice(0, 3).map((category, index) => (
                   <span
                     key={index}
                     className="px-2 py-1 bg-blue-600/20 border border-blue-500/30 rounded text-xs text-blue-300"
@@ -175,7 +176,7 @@ function App() {
             <div className="p-6">
               <div className="flex justify-between items-start mb-6">
                 <h2 className="text-2xl font-bold text-white">
-                  {selectedTool.tool_name}
+                  {selectedTool.name || selectedTool.tool_name}
                 </h2>
                 <button
                   onClick={closeModal}
@@ -216,17 +217,15 @@ function App() {
                 {selectedTool.pricing && (
                   <div>
                     <h3 className="text-lg font-semibold text-white mb-2">Pricing</h3>
-                    <div className="bg-white/5 rounded-lg p-4">
-                      <div 
-                        className="text-gray-300"
-                        dangerouslySetInnerHTML={{ __html: marked(selectedTool.pricing) }}
-                      />
-                    </div>
+                    <div 
+                      className="bg-white/5 rounded-lg p-4"
+                      dangerouslySetInnerHTML={{ __html: marked(selectedTool.pricing) }}
+                    />
                   </div>
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  {selectedTool.categories?.map((category, index) => (
+                  {(selectedTool.category || selectedTool.categories || []).map((category, index) => (
                     <span
                       key={index}
                       className="px-3 py-1 bg-blue-600/20 border border-blue-500/30 rounded text-sm text-blue-300"
