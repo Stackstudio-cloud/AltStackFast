@@ -9,6 +9,7 @@ import { adminAuthMiddleware } from './middleware/auth.js';
 import toolsRouter from './routes/tools.js';
 import analyzeRouter from './routes/analyze.js';
 import mcpRouter from './routes/mcp.js'; // Import the new MCP route
+import blueprintRouter from './routes/blueprint.js';
 
 
 // Load environment variables - try .env.local first, then fallback to default
@@ -61,6 +62,7 @@ export { firestore };
 // --- Mount Routes ---
 app.use('/v1/tools', toolsRouter);
 app.use('/v1/analyze', analyzeRouter);
+app.use('/v1/blueprint', blueprintRouter);
 app.use('/mcp/v1', mcpRouter);
 
 // Health check endpoint
