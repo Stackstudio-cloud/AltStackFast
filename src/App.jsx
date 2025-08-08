@@ -103,53 +103,26 @@ const App = () => {
   // --- Core "AI Brain" to fetch blueprint ---
   const fetchBlueprintFromAI = async (rawIdea) => {
     setIsLoading(true);
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-    const stackContext = JSON.stringify(stackRegistry, null, 2);
-    const metaPrompt = `You are a world-class software architect. A user has provided an idea for a web application. You also have access to a database of AI development tools, backends, frontends, and boilerplates.
-
-User's Idea: "${rawIdea}"
-
-Stack Registry Database:
-${stackContext}
-
-Based on the user's idea AND the available stack components, create a comprehensive project blueprint. Recommend the best workflow (single tool or sequence), a compatible backend, frontend tool, and boilerplate. Return your response *only* as a valid JSON object.`;
-    
-    const payload = {
-      contents: [{ role: "user", parts: [{ text: metaPrompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: "OBJECT",
-          properties: {
-            title: { type: "STRING" }, techStack: { type: "STRING" },
-            backendLogic: { type: "ARRAY", items: { type: "STRING" } },
-            frontendLogic: { type: "ARRAY", items: { type: "STRING" } },
-            recommendedWorkflow: { type: "OBJECT", properties: {
-                name: { type: "STRING" },
-                stages: { type: "ARRAY", items: { type: "STRING" } },
-                reasoning: { type: "STRING" }
-            }},
-            recommendedBackend: { type: "OBJECT", properties: { name: { type: "STRING" }, reasoning: { type: "STRING" } } },
-            recommendedFrontend: { type: "OBJECT", properties: { name: { type: "STRING" }, reasoning: { type: "STRING" } } },
-            recommendedBoilerplate: { type: "OBJECT", properties: { name: { type: "STRING" }, reasoning: { type: "STRING" } } }
-          },
-          required: ["title", "techStack", "backendLogic", "frontendLogic", "recommendedWorkflow"]
-        }
-      }
-    };
+    const apiBase = import.meta.env.VITE_API_URL || 'https://stackfast-api.vercel.app';
     try {
-      const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) throw new Error(`API request failed: ${response.statusText}`);
-      const result = await response.json();
-      if (result.candidates && result.candidates.length > 0) {
-        const blueprint = JSON.parse(result.candidates[0].content.parts[0].text);
-        blueprint.rawIdea = rawIdea;
-        return blueprint;
-      } else { throw new Error("Invalid response from AI."); }
+      const response = await fetch(`${apiBase}/v1/blueprint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rawIdea, stackRegistry }),
+      });
+
+      const text = await response.text();
+      if (!response.ok) throw new Error(`API request failed: ${response.status} ${text}`);
+
+      let payload;
+      try { payload = JSON.parse(text); } catch (e) { throw new Error(`Invalid JSON from API: ${text}`); }
+      if (!payload?.success) throw new Error(payload?.error || 'Unknown API error');
+
+      const blueprint = { ...payload.data, rawIdea };
+      return blueprint;
     } catch (error) {
-      console.error("Error fetching blueprint from AI:", error);
-      alert("Failed to generate the project blueprint. Please try again.");
+      console.error('Error fetching blueprint from API:', error);
+      alert(`Failed to generate the project blueprint. ${error?.message || ''}`);
       return null;
     } finally {
       setIsLoading(false);
