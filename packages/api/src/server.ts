@@ -23,7 +23,8 @@ try {
 const app = express();
 
 // --- Security Middleware ---
-app.use(cors()); // Enable Cross-Origin Resource Sharing
+const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '*';
+app.use(cors({ origin: FRONTEND_ORIGIN === '*' ? true : FRONTEND_ORIGIN }));
 app.use(helmet()); // Set various security headers
 app.use(express.json());
 

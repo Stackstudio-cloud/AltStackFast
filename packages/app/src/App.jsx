@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { marked } from 'marked'
+import { apiFetch } from './lib/apiClient'
 
 function App() {
   const [tools, setTools] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedTool, setSelectedTool] = useState(null)
-
-  const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api' : '')
 
   useEffect(() => {
     fetchTools()
@@ -16,12 +15,7 @@ function App() {
   const fetchTools = async () => {
     try {
       setLoading(true)
-      const response = await fetch(`${API_URL}/v1/tools`)
-      if (!response.ok) {
-        const text = await response.text()
-        throw new Error(`HTTP ${response.status}: ${text}`)
-      }
-      const data = await response.json()
+      const data = await apiFetch('/v1/tools')
       setTools(data.data || data.tools || [])
     } catch (err) {
       console.error('Error fetching tools:', err)
