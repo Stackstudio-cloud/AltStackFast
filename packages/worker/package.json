@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/worker.js",
-    "dev": "tsx watch src/worker.ts"
+    "dev": "tsx watch src/worker.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@stackfast/schemas": "*",

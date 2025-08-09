@@ -34,8 +34,12 @@ export const blueprintSchema = z.object({
     .optional()
 });
 
-const callGeminiWithRetry = async (apiUrl: string, payload: any, { attempts = 2, timeoutMs = 30000 }: { attempts?: number; timeoutMs?: number }) => {
-  let lastErr: any;
+const callGeminiWithRetry = async (
+  apiUrl: string,
+  payload: Record<string, unknown>,
+  { attempts = 2, timeoutMs = 30000 }: { attempts?: number; timeoutMs?: number }
+) => {
+  let lastErr: unknown;
   for (let i = 0; i < attempts; i += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -63,7 +67,7 @@ const callGeminiWithRetry = async (apiUrl: string, payload: any, { attempts = 2,
       const content = outer?.candidates?.[0]?.content?.parts?.[0]?.text;
       const parsed = typeof content === 'string' ? JSON.parse(content) : content;
       return parsed;
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timer);
       lastErr = err;
       // Retry on abort/timeout or fetch network errors
@@ -93,7 +97,8 @@ router.post('/', async (req, res) => {
     contents: [{ role: 'user', parts: [{ text: metaPrompt }] }],
     generationConfig: { responseMimeType: 'application/json', temperature: 0.2, topP: 0.9 },
   };
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   try {
     const raw = await callGeminiWithRetry(apiUrl, payload, { attempts: 2, timeoutMs: 30000 });
@@ -143,8 +148,9 @@ router.post('/', async (req, res) => {
     };
 
     return res.status(200).json({ success: true, data: safe });
-  } catch (error: any) {
-    return res.status(502).json({ success: false, error: error?.message || 'Failed to fetch from Gemini' });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to fetch from Gemini';
+    return res.status(502).json({ success: false, error: msg });
   }
 });
 

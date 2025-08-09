@@ -43,7 +43,7 @@ RUN npm install
 RUN npx turbo run build
 
 # Install Playwright browsers
-RUN npx playwright install chromium
+RUN npx playwright install --with-deps chromium
 
 # Set the final command to run the compiled worker
 CMD ["node", "packages/worker/dist/worker.js"] 

@@ -3,7 +3,19 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // In-memory job storage for Week 2 PoC
-const jobs = new Map<string, any>();
+type StoredJob = {
+  id: string;
+  name: string;
+  data: AnalysisJobData;
+  status: 'waiting' | 'active' | 'completed' | 'failed';
+  createdAt: Date;
+  updatedAt?: Date;
+  progress?: number;
+  result?: AnalysisJobResult;
+  failedReason?: string;
+  priority: number;
+};
+const jobs = new Map<string, StoredJob>();
 let jobCounter = 0;
 
 // Job types
@@ -33,7 +45,7 @@ export interface AnalysisJobResult {
 
 // Mock queue for Week 2 PoC
 export const analysisQueue = {
-  add: async (name: string, data: AnalysisJobData, options?: any) => {
+  add: async (name: string, data: AnalysisJobData, options?: { priority?: number }) => {
     const jobId = `job_${++jobCounter}`;
     const job = {
       id: jobId,
@@ -123,7 +135,12 @@ export const getJobStatus = async (jobId: string) => {
 };
 
 // Update job status (for worker)
-export const updateJobStatus = (jobId: string, status: string, result?: any, error?: string) => {
+export const updateJobStatus = (
+  jobId: string,
+  status: 'waiting' | 'active' | 'completed' | 'failed',
+  result?: AnalysisJobResult,
+  error?: string,
+) => {
   const job = jobs.get(jobId);
   if (job) {
     job.status = status;

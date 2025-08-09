@@ -7,7 +7,8 @@
     "postinstall": "cd ../schemas && npm run build",
     "build": "cd ../schemas && npm run build && tsc",
     "start": "node dist/server.js",
-    "dev": "tsx watch src/server.ts"
+    "dev": "tsx watch src/server.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@stackfast/schemas": "*",
@@ -18,7 +19,8 @@
     "jsonwebtoken": "^9.0.1",
     "@google-cloud/firestore": "^7.0.0",
     "dotenv": "^16.3.1",
-    "zod": "^3.22.2"
+    "zod": "^3.22.2",
+    "etag": "^1.8.1"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
@@ -30,6 +32,6 @@
     "tsx": "^4.0.0"
   },
   "engines": {
-    "node": "22.x"
+    "node": "20.x"
   }
 }

@@ -14,12 +14,19 @@ export async function getChangedTools(firestore: Firestore): Promise<ToolInfo[]>
   console.log('🔍 Fetching latest Awesome AI Dev Tools list...');
   
   // 1. Fetch the latest content from GitHub
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  const headers: Record<string, string> = {
+    'Accept': 'application/vnd.github.v3.raw',
+    'User-Agent': 'Stackfast-RAG-Worker/1.0.0',
+  };
+  if (process.env.GITHUB_TOKEN) {
+    headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
   const response = await fetch(AWESOME_LIST_URL, {
-    headers: { 
-      'Accept': 'application/vnd.github.v3.raw',
-      'User-Agent': 'Stackfast-RAG-Worker/1.0.0'
-    }
-  });
+    headers,
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer));
   
   if (!response.ok) {
     throw new Error(`Failed to fetch Awesome list from GitHub: ${response.status} ${response.statusText}`);

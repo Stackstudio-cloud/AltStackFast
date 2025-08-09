@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { firestore } from '../server.js';
+import { firestore } from '../server';
 import { toolProfileSchema } from '@stackfast/schemas';
 
 const router = Router();

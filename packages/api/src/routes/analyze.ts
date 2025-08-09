@@ -13,7 +13,7 @@ const analyzeBodySchema = z.object({
 
 // The URL of your worker service deployed on Fly.io or another platform.
 // This should be in your .env file.
-const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8081/analyze';
+const WORKER_URL = process.env.WORKER_URL || 'http://localhost:8080/analyze';
 
 router.post('/', async (req, res) => {
   const parseResult = analyzeBodySchema.safeParse(req.body);
@@ -27,11 +27,22 @@ router.post('/', async (req, res) => {
   }
 
   if (!process.env.QSTASH_URL || !process.env.QSTASH_TOKEN) {
-    console.error("QStash environment variables not set.");
-    return res.status(500).json({ 
-      success: false,
-      error: "Queueing service is not configured." 
-    });
+    console.warn("QStash environment variables not set. Falling back to direct worker call.");
+    try {
+      const directResp = await fetch(WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parseResult.data),
+      });
+      const text = await directResp.text();
+      if (!directResp.ok) {
+        throw new Error(`Worker error ${directResp.status}: ${text}`);
+      }
+      return res.status(200).json({ success: true, data: JSON.parse(text) });
+    } catch (err) {
+      console.error('Direct worker call failed:', err);
+      return res.status(502).json({ success: false, error: 'Worker unavailable', details: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   try {

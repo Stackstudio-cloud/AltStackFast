@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { toolProfileSchema } from '@altstackfast/schemas';
+import { toolProfileSchema } from '@stackfast/schemas';
 
 // Create a simplified JSON schema for Gemini API
 const toolProfileJsonSchema = {
@@ -41,12 +41,13 @@ RULES:
 ---
 `;
 
-export async function callGeminiToAnalyze(textContent: string): Promise<any> {
+export async function callGeminiToAnalyze(textContent: string): Promise<Record<string, unknown>> {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error('GEMINI_API_KEY is not defined.');
   }
 
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`;
+  const model = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
 
   const payload = {
     contents: [{
@@ -71,7 +72,7 @@ export async function callGeminiToAnalyze(textContent: string): Promise<any> {
     throw new Error(`Gemini API request failed with status ${response.status}: ${errorBody}`);
   }
 
-  const result = await response.json() as {
+  const result = (await response.json()) as {
     candidates?: Array<{
       content: {
         parts: Array<{

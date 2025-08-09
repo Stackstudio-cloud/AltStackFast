@@ -14,6 +14,9 @@ export const toolProfileSchema = z.object({
   last_updated: z.string().datetime(),
   schema_version: z.string(),
   requires_review: z.boolean().optional(),
+  source_url: z.string().url().optional(),
+  source_description: z.string().optional(),
+  scraping_failed: z.boolean().optional(),
 });
 
 export type ToolProfile = z.infer<typeof toolProfileSchema>; 

@@ -43,11 +43,11 @@ npm install
 ```
 Run frontend:
 ```bash
-npm run dev --workspace=@altstackfast/app
+npm run dev --workspace=@stackfast/app
 ```
 Run API:
 ```bash
-npm run dev --workspace=@altstackfast/api
+npm run dev --workspace=@stackfast/api
 ```
 
 ## 🔐 Environment variables

@@ -5,11 +5,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-import { adminAuthMiddleware } from './middleware/auth.js';
-import toolsRouter from './routes/tools.js';
-import analyzeRouter from './routes/analyze.js';
-import mcpRouter from './routes/mcp.js'; // Import the new MCP route
-import blueprintRouter from './routes/blueprint.js';
+import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
+import toolsRouter from './routes/tools';
+import analyzeRouter from './routes/analyze';
+import mcpRouter from './routes/mcp'; // Import the new MCP route
+import blueprintRouter from './routes/blueprint';
 
 
 // Load environment variables - try .env.local first, then fallback to default
@@ -21,13 +21,29 @@ try {
 }
 
 const app = express();
+// Ensure required secrets in production
+try { assertProdSecrets(); } catch (e) { console.error(String(e)); }
 
 // --- Security Middleware ---
 // Normalize to avoid trailing slash mismatches (e.g., https://site.com/ → https://site.com)
-const FRONTEND_ORIGIN_RAW = process.env.FRONTEND_ORIGIN || '*';
-const FRONTEND_ORIGIN = FRONTEND_ORIGIN_RAW === '*' ? '*' : FRONTEND_ORIGIN_RAW.replace(/\/$/, '');
-app.use(cors({ origin: FRONTEND_ORIGIN === '*' ? true : FRONTEND_ORIGIN }));
-app.use(helmet()); // Set various security headers
+const FRONTEND_ORIGINS_RAW = process.env.FRONTEND_ORIGIN || process.env.FRONTEND_ORIGINS || '*';
+const allowedOrigins = FRONTEND_ORIGINS_RAW.split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes('*')) return callback(null, true);
+      return allowedOrigins.includes(origin) ? callback(null, true) : callback(new Error('CORS not allowed'));
+    },
+    credentials: true,
+  })
+);
+// Basic CSP and HSTS via Helmet
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // keep simple; can be hardened later
+    hsts: process.env.NODE_ENV === 'production' ? { maxAge: 15552000 } : false,
+  })
+);
 app.use(express.json());
 
 // --- Rate Limiting ---
@@ -68,8 +84,21 @@ app.use('/v1/analyze', analyzeRouter);
 app.use('/v1/blueprint', blueprintRouter);
 app.use('/mcp/v1', mcpRouter);
 
-// Health check endpoint
+// Health check and readiness endpoints
 app.get('/healthz', (_, res) => res.status(200).send('ok'));
+app.get('/readyz', async (_, res) => {
+  try {
+    if (!firestore) return res.status(200).json({ ok: true, firestore: false });
+    const timeoutMs = Number(process.env.READYZ_TIMEOUT_MS || 1000);
+    await Promise.race([
+      firestore.listCollections(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+    ]);
+    return res.status(200).json({ ok: true, firestore: true });
+  } catch {
+    return res.status(503).json({ ok: false, firestore: false });
+  }
+});
 
 // Queue health endpoint
 app.get('/queue/health', (_, res) => {

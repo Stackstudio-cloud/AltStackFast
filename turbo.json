@@ -25,6 +25,13 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     }
+    ,
+    "test": {
+      "cache": false
+    },
+    "@stackfast/api#test": { "cache": false },
+    "@stackfast/app#test": { "cache": false },
+    "@stackfast/worker#test": { "cache": false }
   },
   "globalDependencies": ["tsconfig.json", "tsconfig.base.json"]
 }

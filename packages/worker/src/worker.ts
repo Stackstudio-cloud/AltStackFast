@@ -53,10 +53,11 @@ app.get('/', (_, res) => {
 app.post('/analyze', async (req, res) => {
   try {
     const { tool_name, url, description } = req.body;
+    const safeDescription: string = description || '';
     
-    if (!tool_name || !url || !description) {
+    if (!tool_name || (!url && !safeDescription)) {
       return res.status(400).json({ 
-        error: 'Missing required fields: tool_name, url, description' 
+        error: 'Invalid request: must include tool_name and at least one of url or description' 
       });
     }
 
@@ -93,7 +94,7 @@ app.post('/analyze', async (req, res) => {
       // 2. Augment: Combine data into rich context
       const context = `
 SOURCE 1 - CURATED LIST DESCRIPTION:
-${description}
+${safeDescription}
 
 SOURCE 2 - OFFICIAL WEBSITE CONTENT:
 ${scrapedText.substring(0, 8000)}
@@ -144,7 +145,7 @@ Ensure the response is structured according to the toolProfileSchema.
       // Fallback analysis
       const fallbackContext = `
 SOURCE - CURATED LIST DESCRIPTION:
-${description}
+${safeDescription}
 
 INSTRUCTIONS:
 Analyze the above information about "${tool_name}" and create a tool profile.

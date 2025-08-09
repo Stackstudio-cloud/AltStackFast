@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { firestore } from '../server.js';
+import { firestore } from '../server';
 import { toolProfileSchema } from '@stackfast/schemas';
-import { adminAuthMiddleware } from '../middleware/auth.js';
+import { adminAuthMiddleware } from '../middleware/auth';
 
 const router = Router();
 
@@ -65,6 +65,13 @@ router.get('/', async (req, res) => {
 
     // Validate every tool against our Zod schema before sending
     const validatedTools = tools.map(tool => toolProfileSchema.parse(tool));
+
+    // ETag for simple client caching
+    const etag = `W/"tools-${validatedTools.length}-${validatedTools[0]?.last_updated || ''}"`;
+    res.setHeader('ETag', etag);
+    if (req.headers['if-none-match'] === etag) {
+      return res.status(304).end();
+    }
 
     res.status(200).json({
       success: true,

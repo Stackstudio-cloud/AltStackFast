@@ -63,8 +63,9 @@ async function checkForUpdates() {
 }
 
 // The handler for individual analysis jobs
-const analysisHandler = async (job: Job) => {
+const analysisHandler = async (job: Job<{ tool_name: string; url?: string; description?: string }>) => {
   const { tool_name, url, description } = job.data;
+  const safeDescription: string = description || '';
   console.log(`[JOB START] Analyzing ${tool_name}...`);
 
   try {
@@ -104,7 +105,7 @@ const analysisHandler = async (job: Job) => {
       // 2. Augment: Combine all our data into a rich context
       const context = `
 SOURCE 1 - CURATED LIST DESCRIPTION:
-${description}
+${safeDescription}
 
 SOURCE 2 - OFFICIAL WEBSITE CONTENT:
 ${scrapedText.substring(0, 8000)}
@@ -158,7 +159,7 @@ Ensure the response is structured according to the toolProfileSchema.
       console.log(`🔄 Falling back to description-only analysis for ${tool_name}`);
       const fallbackContext = `
 SOURCE - CURATED LIST DESCRIPTION:
-${description}
+${safeDescription}
 
 INSTRUCTIONS:
 Analyze the above information about "${tool_name}" and create a tool profile.

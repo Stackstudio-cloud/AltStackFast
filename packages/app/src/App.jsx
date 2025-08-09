@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import { apiFetch } from './lib/apiClient'
 
 function App() {
@@ -328,7 +329,7 @@ function App() {
                     <h3 className="text-lg font-semibold text-white mb-2">Pricing</h3>
                     <div 
                       className="bg-white/5 rounded-lg p-4"
-                      dangerouslySetInnerHTML={{ __html: marked(selectedTool.pricing) }}
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked(selectedTool.pricing || '')) }}
                     />
                   </div>
                 )}

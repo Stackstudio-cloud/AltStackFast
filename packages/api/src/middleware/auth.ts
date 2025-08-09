@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 
 // This secret should be a long, random string stored in your .env file
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-for-dev';
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 export const adminAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -22,3 +23,10 @@ export const adminAuthMiddleware = (req: Request, res: Response, next: NextFunct
     return res.status(403).json({ error: 'Forbidden: Invalid token.' });
   }
 }; 
+
+// Fail fast if missing JWT secret in production
+export const assertProdSecrets = () => {
+  if (NODE_ENV === 'production' && (!process.env.JWT_SECRET || process.env.JWT_SECRET === 'default-secret-for-dev')) {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+};
