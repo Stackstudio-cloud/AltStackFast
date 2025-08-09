@@ -84,7 +84,7 @@ app.get('/queue/health', (_, res) => {
 // Root endpoint for the entire app
 app.get('/', (_, res) => {
   res.json({
-    name: 'AltStackFast API',
+    name: 'Stackfast API',
     version: '1.0.0',
     status: 'running'
   });

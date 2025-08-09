@@ -12,7 +12,7 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@altstackfast/schemas": ["../schemas/src"]
+      "@stackfast/schemas": ["../schemas/src"]
     }
   },
   "include": ["src/**/*"],

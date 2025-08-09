@@ -1,6 +1,6 @@
-# AltStackFast · Workflow Architect
+# Stackfast · Workflow Architect
 
-Build fast, but build right. AltStackFast helps you turn product ideas into actionable, tool‑aware build plans and keeps a living registry of AI development tools.
+Build fast, but build right. Stackfast helps you turn product ideas into actionable, tool‑aware build plans and keeps a living registry of AI development tools.
 
 Live
 - Frontend: `https://stackfast.vercel.app/`
@@ -26,7 +26,7 @@ Live
   - `packages/schemas` – shared Zod/TS types for tools
 
 ```
-AltStackFast/
+Stackfast/
   packages/
     app/        # Vite + React UI
     api/        # Express API (serverless on Vercel)

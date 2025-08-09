@@ -4,7 +4,7 @@ import path from 'path';
 import { chromium } from 'playwright';
 import { Firestore } from '@google-cloud/firestore';
 import { callGeminiToAnalyze } from './gemini';
-import { toolProfileSchema } from '@altstackfast/schemas';
+import { toolProfileSchema } from '@stackfast/schemas';
 import { getChangedTools } from './lib/github';
 
 // Load environment variables
@@ -32,7 +32,7 @@ app.get('/healthz', (_, res) => res.status(200).send('ok'));
 // Root endpoint
 app.get('/', (_, res) => {
   res.json({
-    name: 'AltStackFast RAG Worker',
+    name: 'Stackfast RAG Worker',
     version: '2.0.0',
     status: 'running',
     features: {
@@ -72,7 +72,7 @@ app.post('/analyze', async (req, res) => {
     const page = await browser.newPage();
     await page.setDefaultTimeout(30000);
     await page.setExtraHTTPHeaders({
-      'User-Agent': 'AltStackFast-RAG-Worker/2.0.0'
+      'User-Agent': 'Stackfast-RAG-Worker/2.0.0'
     });
     
     try {

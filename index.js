@@ -36,7 +36,7 @@ app.get('/queue/health', (_, res) => {
 // Root endpoint
 app.get('/', (_, res) => {
   res.json({
-    name: 'AltStackFast MCP Server',
+    name: 'Stackfast MCP Server',
     version: '1.0.0',
     status: 'running',
     endpoints: {

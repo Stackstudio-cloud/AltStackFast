@@ -9,19 +9,19 @@
       "cache": false,
       "persistent": true
     },
-    "@altstackfast/app#build": {
+    "@stackfast/app#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@altstackfast/api#build": {
+    "@stackfast/api#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@altstackfast/worker#build": {
+    "@stackfast/worker#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
-    "@altstackfast/schemas#build": {
+    "@stackfast/schemas#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     }

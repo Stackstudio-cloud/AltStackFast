@@ -1,14 +1,14 @@
 {
-  "name": "altstackfast-monorepo",
+  "name": "stackfast-monorepo",
   "private": true,
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
     "build": "turbo run build",
-    "dev": "npm run dev --workspace=@altstackfast/app",
-    "dev:api": "npm run dev --workspace=@altstackfast/api",
-    "dev:worker": "npm run dev --workspace=@altstackfast/worker"
+    "dev": "npm run dev --workspace=@stackfast/app",
+    "dev:api": "npm run dev --workspace=@stackfast/api",
+    "dev:worker": "npm run dev --workspace=@stackfast/worker"
   },
   "dependencies": {
     "zod": "^3.22.2",

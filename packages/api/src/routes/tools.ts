@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { firestore } from '../server.js';
-import { toolProfileSchema } from '@altstackfast/schemas';
+import { toolProfileSchema } from '@stackfast/schemas';
 import { adminAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();

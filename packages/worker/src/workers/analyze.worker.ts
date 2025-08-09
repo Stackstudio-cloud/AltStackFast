@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { Firestore } from '@google-cloud/firestore';
 import { Redis } from 'ioredis';
 import { callGeminiToAnalyze } from '../gemini';
-import { toolProfileSchema } from '@altstackfast/schemas';
+import { toolProfileSchema } from '@stackfast/schemas';
 import { getChangedTools, getLastCheckedTime } from '../lib/github';
 
 const ANALYZE_QUEUE_NAME = 'analyze-tool';

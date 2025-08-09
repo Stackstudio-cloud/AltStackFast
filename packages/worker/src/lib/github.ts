@@ -17,7 +17,7 @@ export async function getChangedTools(firestore: Firestore): Promise<ToolInfo[]>
   const response = await fetch(AWESOME_LIST_URL, {
     headers: { 
       'Accept': 'application/vnd.github.v3.raw',
-      'User-Agent': 'AltStackFast-RAG-Worker/1.0.0'
+      'User-Agent': 'Stackfast-RAG-Worker/1.0.0'
     }
   });
   
