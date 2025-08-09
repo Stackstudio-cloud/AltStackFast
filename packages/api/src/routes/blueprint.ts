@@ -83,13 +83,39 @@ router.post('/', async (req, res) => {
 
   const payload = {
     contents: [{ role: 'user', parts: [{ text: metaPrompt }] }],
-    generationConfig: { responseMimeType: 'application/json' },
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.2, topP: 0.9 },
   };
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
 
   try {
-    const raw = await callGeminiWithRetry(apiUrl, payload, { attempts: 2, timeoutMs: 15000 });
-    const safe = blueprintSchema.parse(raw);
+    const raw = await callGeminiWithRetry(apiUrl, payload, { attempts: 2, timeoutMs: 30000 });
+    let safe = blueprintSchema.parse(raw);
+
+    // Ensure minimum useful content even if the model under-fills arrays
+    const ensureMinItems = (items: unknown, min: number, fillers: string[]): string[] => {
+      const base = Array.isArray(items) ? (items as string[]) : [];
+      let i = 0;
+      while (base.length < min && i < fillers.length) {
+        base.push(fillers[i]);
+        i += 1;
+      }
+      return base;
+    };
+
+    safe = {
+      ...safe,
+      backendLogic: ensureMinItems(safe.backendLogic, 3, [
+        'Design database schema and migrations',
+        'Implement authentication and authorization',
+        'Expose REST endpoints for core features'
+      ]),
+      frontendLogic: ensureMinItems(safe.frontendLogic, 3, [
+        'Build main dashboard and navigation layout',
+        'Implement forms with validation for core flows',
+        'Integrate API calls with loading and error states'
+      ]),
+    };
+
     return res.status(200).json({ success: true, data: safe });
   } catch (error: any) {
     return res.status(502).json({ success: false, error: error?.message || 'Failed to fetch from Gemini' });
