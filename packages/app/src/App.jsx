@@ -134,7 +134,7 @@ function App() {
                   const resp = await apiFetch('/v1/blueprint', {
                     method: 'POST',
                     body: JSON.stringify({ rawIdea: idea })
-                  })
+                  }, 30000)
                   setBlueprint(resp.data || resp)
                 } catch (e) {
                   setBlueprintError(e.message)

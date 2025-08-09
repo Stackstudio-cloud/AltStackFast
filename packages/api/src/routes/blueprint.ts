@@ -10,21 +10,23 @@ const requestSchema = z.object({
 
 // Strict response schema returned to the client
 export const blueprintSchema = z.object({
-  title: z.string(),
+  title: z.string().default('Untitled Project'),
   techStack: z.string().optional().default(''),
   backendLogic: z.array(z.string()).default([]),
   frontendLogic: z.array(z.string()).default([]),
-  recommendedWorkflow: z.object({
-    name: z.string(),
-    stages: z.array(z.string()),
-    reasoning: z.string().optional().default('')
-  }),
+  recommendedWorkflow: z
+    .object({
+      name: z.string().default('Recommended Workflow'),
+      stages: z.array(z.string()).default([]),
+      reasoning: z.string().optional().default('')
+    })
+    .default({ name: 'Recommended Workflow', stages: [], reasoning: '' }),
   recommendedBackend: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional(),
   recommendedFrontend: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional(),
   recommendedBoilerplate: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional()
 });
 
-const callGeminiWithRetry = async (apiUrl: string, payload: any, { attempts = 2, timeoutMs = 15000 }: { attempts?: number; timeoutMs?: number }) => {
+const callGeminiWithRetry = async (apiUrl: string, payload: any, { attempts = 2, timeoutMs = 30000 }: { attempts?: number; timeoutMs?: number }) => {
   let lastErr: any;
   for (let i = 0; i < attempts; i += 1) {
     const controller = new AbortController();
