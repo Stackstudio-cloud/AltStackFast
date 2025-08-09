@@ -23,7 +23,9 @@ try {
 const app = express();
 
 // --- Security Middleware ---
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || '*';
+// Normalize to avoid trailing slash mismatches (e.g., https://site.com/ → https://site.com)
+const FRONTEND_ORIGIN_RAW = process.env.FRONTEND_ORIGIN || '*';
+const FRONTEND_ORIGIN = FRONTEND_ORIGIN_RAW === '*' ? '*' : FRONTEND_ORIGIN_RAW.replace(/\/$/, '');
 app.use(cors({ origin: FRONTEND_ORIGIN === '*' ? true : FRONTEND_ORIGIN }));
 app.use(helmet()); // Set various security headers
 app.use(express.json());

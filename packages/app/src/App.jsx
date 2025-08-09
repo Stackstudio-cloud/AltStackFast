@@ -7,6 +7,10 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [selectedTool, setSelectedTool] = useState(null)
+  const [idea, setIdea] = useState('')
+  const [blueprintLoading, setBlueprintLoading] = useState(false)
+  const [blueprintError, setBlueprintError] = useState(null)
+  const [blueprint, setBlueprint] = useState(null)
 
   useEffect(() => {
     fetchTools()
@@ -106,6 +110,86 @@ function App() {
               </span>
             </div>
           </div>
+        </div>
+
+        {/* Blueprint Generator */}
+        <div className="max-w-3xl mx-auto mb-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
+          <h3 className="text-2xl font-semibold text-white mb-3">Generate a Project Blueprint</h3>
+          <p className="text-gray-300 mb-4">Describe your idea and we’ll propose a workflow, stack, and next steps.</p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              type="text"
+              value={idea}
+              onChange={(e) => setIdea(e.target.value)}
+              placeholder="e.g. A SaaS to summarize Zoom recordings into action items"
+              className="flex-1 px-4 py-3 rounded-lg bg-black/30 border border-white/20 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={async () => {
+                if (!idea.trim()) return;
+                setBlueprint(null)
+                setBlueprintError(null)
+                setBlueprintLoading(true)
+                try {
+                  const resp = await apiFetch('/v1/blueprint', {
+                    method: 'POST',
+                    body: JSON.stringify({ rawIdea: idea })
+                  })
+                  setBlueprint(resp.data || resp)
+                } catch (e) {
+                  setBlueprintError(e.message)
+                } finally {
+                  setBlueprintLoading(false)
+                }
+              }}
+              className="px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold disabled:opacity-50"
+              disabled={blueprintLoading}
+            >
+              {blueprintLoading ? 'Generating…' : 'Generate'}
+            </button>
+          </div>
+          {blueprintError && (
+            <div className="mt-3 text-sm text-red-300">{blueprintError}</div>
+          )}
+          {blueprint && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-black/30 border border-white/10 rounded-lg p-4">
+                <h4 className="text-white font-semibold mb-2">Overview</h4>
+                <div className="text-gray-300 text-sm space-y-1">
+                  <p><span className="text-gray-400">Title:</span> {blueprint.title}</p>
+                  {blueprint.techStack && <p><span className="text-gray-400">Tech Stack:</span> {blueprint.techStack}</p>}
+                  {blueprint.recommendedWorkflow && (
+                    <div>
+                      <p className="text-gray-400">Workflow:</p>
+                      <p className="text-gray-300">{blueprint.recommendedWorkflow.name}</p>
+                      {blueprint.recommendedWorkflow.stages?.length > 0 && (
+                        <ul className="list-disc list-inside text-gray-300">
+                          {blueprint.recommendedWorkflow.stages.map((s, i) => <li key={i}>{s}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-black/30 border border-white/10 rounded-lg p-4">
+                <h4 className="text-white font-semibold mb-2">Implementation Notes</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-400 mb-1">Backend</p>
+                    <ul className="list-disc list-inside text-gray-300 space-y-1">
+                      {(blueprint.backendLogic || []).map((x, i) => <li key={i}>{x}</li>)}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 mb-1">Frontend</p>
+                    <ul className="list-disc list-inside text-gray-300 space-y-1">
+                      {(blueprint.frontendLogic || []).map((x, i) => <li key={i}>{x}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tools Grid */}
