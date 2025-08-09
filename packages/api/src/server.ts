@@ -1,8 +1,10 @@
 import express from 'express';
 import { Firestore } from '@google-cloud/firestore';
+import { existsSync } from 'fs';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
+import * as Sentry from '@sentry/node';
 import rateLimit from 'express-rate-limit';
 
 import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
@@ -20,7 +22,13 @@ try {
   dotenv.config();
 }
 
+// Sentry init (no-op if DSN missing)
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN });
+}
+
 const app = express();
+// Skip Sentry request handler wiring (SDK v8 types may not include Handlers)
 // Ensure required secrets in production
 try { assertProdSecrets(); } catch (e) { console.error(String(e)); }
 
@@ -55,21 +63,35 @@ const apiLimiter = rateLimit({
 });
 app.use('/v1/', apiLimiter); // Apply rate limiting to all v1 routes
 
-// Initialize Firestore with error handling
+// Initialize Firestore with robust env handling
 let firestore: Firestore | null = null;
 try {
-  let credentials;
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    try {
-      // Try to parse as JSON first (for local dev)
-      credentials = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS);
-    } catch (e) {
-      // If parsing fails, assume it's a Base64 encoded string (for Vercel)
-      const decodedString = Buffer.from(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'base64').toString('utf-8');
-      credentials = JSON.parse(decodedString);
+  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  let firestoreOptions: Record<string, unknown> = {};
+  if (raw) {
+    // If it's a path, let ADC pick it up
+    if (existsSync(raw)) {
+      // Leave options empty; the library will read the file path from env
+    } else {
+      // Try raw JSON
+      try {
+        firestoreOptions.credentials = JSON.parse(raw);
+      } catch {
+        // Try base64 → JSON
+        try {
+          const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+          firestoreOptions.credentials = JSON.parse(decoded);
+        } catch {
+          // Try newline-normalized JSON
+          try {
+            const normalized = raw.replace(/\\n/g, '\n');
+            firestoreOptions.credentials = JSON.parse(normalized);
+          } catch {}
+        }
+      }
     }
   }
-  firestore = new Firestore({ credentials });
+  firestore = new Firestore(firestoreOptions);
   console.log('✅ Firestore initialized successfully');
 } catch (error) {
   console.warn('⚠️ Firestore initialization failed:', error);

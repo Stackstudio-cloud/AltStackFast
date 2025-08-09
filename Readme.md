@@ -91,6 +91,7 @@ See `env.example` for the latest list. Key variables:
 | Worker | `GITHUB_TOKEN` | Optional, raises GitHub API rate limits |
 | Worker | `WORKER_PORT` | Local worker port, default `8080` |
 | API | `WORKER_URL` | Direct worker fallback URL, default `http://localhost:8080/analyze` |
+| API | `TOOLS_SOURCE` | `firestore` (prod) or `mock` (local) |
 
 Optional (queueing): `QSTASH_URL`, `QSTASH_TOKEN`.
 

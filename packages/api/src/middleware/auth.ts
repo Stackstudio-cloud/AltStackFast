@@ -16,7 +16,9 @@ export const adminAuthMiddleware = (req: Request, res: Response, next: NextFunct
 
   try {
     // Verify the token using our secret
-    jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload | string;
+    // Attach minimal identity to request for downstream auditing
+    (req as any).user = typeof decoded === 'string' ? { sub: decoded } : decoded;
     // If the token is valid, proceed to the next handler
     next();
   } catch (error) {

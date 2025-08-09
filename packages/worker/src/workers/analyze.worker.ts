@@ -80,12 +80,12 @@ const analysisHandler = async (job: Job<{ tool_name: string; url?: string; descr
     
     // Set a reasonable timeout and user agent
     await page.setDefaultTimeout(30000);
-    await page.setExtraHTTPHeaders({
+  await page.setExtraHTTPHeaders({
       'User-Agent': 'AltStackFast-RAG-Worker/1.0.0'
     });
     
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.goto(url || 'about:blank', { waitUntil: 'domcontentloaded' });
       
       // Extract text content, focusing on main content areas
       const scrapedText = await page.evaluate(() => {

@@ -8,10 +8,11 @@
     "outDir": "./dist",
     "esModuleInterop": true,
     "strict": true,
-    "composite": true
+    "composite": true,
+    "types": ["node"]
   },
   "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
   "references": [
     { "path": "../schemas" }
   ]

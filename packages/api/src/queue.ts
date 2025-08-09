@@ -47,7 +47,7 @@ export interface AnalysisJobResult {
 export const analysisQueue = {
   add: async (name: string, data: AnalysisJobData, options?: { priority?: number }) => {
     const jobId = `job_${++jobCounter}`;
-    const job = {
+    const job: StoredJob = {
       id: jobId,
       name,
       data,

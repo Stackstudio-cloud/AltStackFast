@@ -28,6 +28,12 @@ function App() {
   const [tools, setTools] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [totalTools, setTotalTools] = useState(0)
+  const [limit, setLimit] = useState(12)
+  const [offset, setOffset] = useState(0)
+  const [searchQ, setSearchQ] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [reviewFilter, setReviewFilter] = useState('') // '', 'true', 'false'
   const [selectedTool, setSelectedTool] = useState(null)
   const [idea, setIdea] = useState('')
   const [blueprintLoading, setBlueprintLoading] = useState(false)
@@ -42,9 +48,38 @@ function App() {
   const [userId, setUserId] = useState(null)
   const [savedPlans, setSavedPlans] = useState([])
 
+  // Admin state
+  const [adminToken, setAdminToken] = useState(() => {
+    try { return localStorage.getItem('ADMIN_JWT') || '' } catch { return '' }
+  })
+  const [adminTools, setAdminTools] = useState([])
+  const [adminLoading, setAdminLoading] = useState(false)
+  const [adminError, setAdminError] = useState('')
+
   useEffect(() => {
-    fetchTools()
-  }, [])
+    fetchTools({ reset: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [limit, categoryFilter])
+
+  // Auto-load last plan if authenticated
+  useEffect(() => {
+    if (!savedPlans || savedPlans.length === 0) return
+    // Load most recent by timestamp if present
+    const recent = [...savedPlans].sort((a, b) => {
+      const ta = Date.parse(a.timestamp || '')
+      const tb = Date.parse(b.timestamp || '')
+      return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta)
+    })[0]
+    if (recent) {
+      setBlueprint(recent)
+      setGeneratedPlan(recent)
+      setIdea(recent.rawIdea || '')
+      setGenerationMode(recent.generationMode || 'auto')
+      setMode(recent.mode || 'single')
+      setSingleTool(recent.singleTool || 'replit')
+      setSelectedWorkflow(recent.selectedWorkflow || 'bolt-replit')
+    }
+  }, [savedPlans])
 
   // Firebase auth + saved plans listener
   useEffect(() => {
@@ -79,16 +114,72 @@ function App() {
     return () => unsub()
   }, [db, userId])
 
-  const fetchTools = async () => {
+  const fetchTools = async ({ reset = false } = {}) => {
     try {
       setLoading(true)
-      const data = await apiFetch('/v1/tools')
-      setTools(data.data || data.tools || [])
+      const params = new URLSearchParams()
+      params.set('limit', String(limit))
+      params.set('offset', String(reset ? 0 : offset))
+      if (searchQ) params.set('q', searchQ)
+      if (categoryFilter) params.set('category', categoryFilter)
+      if (reviewFilter) params.set('requires_review', reviewFilter)
+      const data = await apiFetch(`/v1/tools?${params.toString()}`)
+      const page = data.data || []
+      setTotalTools(data.total ?? page.length)
+      if (reset) {
+        setOffset(page.length)
+        setTools(page)
+      } else {
+        setOffset((prev) => prev + page.length)
+        setTools((prev) => [...prev, ...page])
+      }
     } catch (err) {
       console.error('Error fetching tools:', err)
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Admin helpers
+  const fetchPendingTools = async () => {
+    try {
+      setAdminLoading(true)
+      setAdminError('')
+      const data = await apiFetch(`/v1/tools?requires_review=true&limit=100`)
+      setAdminTools(data.data || [])
+    } catch (e) {
+      setAdminError(e.message)
+    } finally {
+      setAdminLoading(false)
+    }
+  }
+
+  const approveTool = async (toolId) => {
+    if (!adminToken) { alert('Set admin token first'); return }
+    try {
+      await apiFetch(`/v1/tools/${toolId}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+      setAdminTools((prev) => prev.filter((t) => t.tool_id !== toolId))
+    } catch (e) {
+      alert(`Approve failed: ${e.message}`)
+    }
+  }
+
+  const rejectTool = async (toolId) => {
+    if (!adminToken) { alert('Set admin token first'); return }
+    const reason = window.prompt('Rejection reason (optional):') || ''
+    try {
+      await apiFetch(`/v1/tools/${toolId}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ reason })
+      })
+      setAdminTools((prev) => prev.filter((t) => t.tool_id !== toolId))
+    } catch (e) {
+      alert(`Reject failed: ${e.message}`)
     }
   }
 
@@ -161,10 +252,10 @@ function App() {
             Explore the latest AI-powered development tools, automatically analyzed and curated 
             using advanced RAG technology.
           </p>
-          <div className="mt-6 flex justify-center space-x-4">
+          <div className="mt-6 flex flex-col md:flex-row items-center justify-center gap-3 md:space-x-4">
             <div className="bg-green-600/20 border border-green-500/30 rounded-lg px-4 py-2">
               <span className="text-green-400 text-sm font-medium">
-                {tools.length} Tools Available
+                {totalTools || tools.length} Tools Available
               </span>
             </div>
             <div className="bg-blue-600/20 border border-blue-500/30 rounded-lg px-4 py-2">
@@ -172,7 +263,84 @@ function App() {
                 Auto-Updated
               </span>
             </div>
+            <div className="flex w-full md:w-auto gap-2">
+              <input
+                type="text"
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                placeholder="Search tools..."
+                className="flex-1 md:w-64 px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white placeholder-gray-400"
+              />
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+              >
+                <option value="">All categories</option>
+                {[...new Set(tools.flatMap((t) => t.category || []))].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select
+                value={reviewFilter}
+                onChange={(e) => setReviewFilter(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+              >
+                <option value="">All</option>
+                <option value="true">Needs review</option>
+                <option value="false">Approved</option>
+              </select>
+              <button
+                onClick={() => fetchTools({ reset: true })}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                Search
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Admin Panel */}
+        <div className="max-w-7xl mx-auto mb-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
+          <h3 className="text-2xl font-semibold text-white mb-3">Admin Review</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <input
+              type="password"
+              value={adminToken}
+              onChange={(e) => { setAdminToken(e.target.value); try { localStorage.setItem('ADMIN_JWT', e.target.value) } catch {} }}
+              placeholder="Admin Bearer Token"
+              className="px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white placeholder-gray-400"
+            />
+            <button
+              onClick={fetchPendingTools}
+              className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              Refresh Pending
+            </button>
+            <div className="text-sm text-gray-300 self-center">{adminLoading ? 'Loading…' : adminError || `${adminTools.length} pending`}</div>
+          </div>
+          {adminTools.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {adminTools.map((t) => (
+                <div key={t.tool_id} className="bg-black/30 border border-white/10 rounded-lg p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="text-white font-semibold">{t.name}</div>
+                      <div className="text-gray-400 text-xs">{t.tool_id}</div>
+                    </div>
+                    <span className="px-2 py-1 bg-yellow-600/20 border border-yellow-500/30 rounded text-xs text-yellow-400">Needs review</span>
+                  </div>
+                  <p className="text-gray-300 text-sm mt-2 line-clamp-3">{t.description}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={() => approveTool(t.tool_id)} className="px-3 py-1 rounded bg-green-600 text-white text-xs">Approve</button>
+                    <button onClick={() => rejectTool(t.tool_id)} className="px-3 py-1 rounded bg-rose-600 text-white text-xs">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-400 text-sm">No pending tools.</p>
+          )}
         </div>
 
         {/* Blueprint Generator */}
@@ -473,6 +641,18 @@ function App() {
               Our RAG system is discovering and analyzing new AI development tools.
               Check back soon!
             </p>
+          </div>
+        )}
+
+        {/* Pagination / Load more */}
+        {offset < (totalTools || 0) && (
+          <div className="flex justify-center mt-10">
+            <button
+              onClick={() => fetchTools({ reset: false })}
+              className="px-6 py-3 rounded-lg bg-white/10 border border-white/20 text-white hover:bg-white/20"
+            >
+              Load more
+            </button>
           </div>
         )}
       </main>

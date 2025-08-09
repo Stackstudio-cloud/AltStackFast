@@ -61,6 +61,18 @@
             }
           ]
         },
+        "popularity_score": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "last_updated": {
           "type": "string",
           "format": "date-time"
@@ -80,6 +92,28 @@
         },
         "scraping_failed": {
           "type": "boolean"
+        },
+        "established": {
+          "type": "string"
+        },
+        "default_use_case": {
+          "type": "string"
+        },
+        "llm_backends": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "reviewed_by": {
+          "type": "string"
+        },
+        "rejected_reason": {
+          "type": "string"
         }
       },
       "required": [

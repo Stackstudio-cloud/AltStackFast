@@ -56,15 +56,62 @@ const mockTools = [
 
 router.get('/', async (req, res) => {
   try {
-    // In the future, this will be:
-    // const snapshot = await firestore.collection('tools').get();
-    // const tools = snapshot.docs.map(doc => doc.data());
+    // Query params: limit, offset, category, q (name substring)
+    const limit = Math.max(0, Math.min(Number(req.query.limit ?? 50), 100));
+    const offset = Math.max(0, Number(req.query.offset ?? 0));
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const requiresReview = typeof req.query.requires_review === 'string' ? req.query.requires_review === 'true' : undefined;
+    const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase() : undefined;
 
-    // For now, use mock data
-    const tools = mockTools;
+    const source = (process.env.TOOLS_SOURCE || 'mock').toLowerCase();
+    let page: any[] = [];
+    let total = 0;
+
+    if (source === 'firestore' && firestore) {
+      // Firestore-backed listing with optional category filter and q search (in-memory for now)
+      let all: any[] = [];
+      if (category) {
+        const snap = await firestore
+          .collection('tools')
+          .where('category', 'array-contains', category)
+          .get();
+        all = snap.docs.map((d) => d.data());
+      } else {
+        const snap = await firestore.collection('tools').get();
+        all = snap.docs.map((d) => d.data());
+      }
+      if (q) {
+        all = all.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
+      }
+      if (typeof requiresReview === 'boolean') {
+        all = all.filter((t) => Boolean(t.requires_review) === requiresReview);
+      }
+      // Sort by last_updated desc if present
+      all.sort((a, b) => {
+        const ta = Date.parse(a.last_updated || '');
+        const tb = Date.parse(b.last_updated || '');
+        return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
+      });
+      total = all.length;
+      page = all.slice(offset, offset + limit);
+    } else {
+      // Mock data fallback
+      let tools = mockTools;
+      if (category) {
+        tools = tools.filter((t) => (t.category || []).includes(category));
+      }
+      if (q) {
+        tools = tools.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
+      }
+      if (typeof requiresReview === 'boolean') {
+        tools = tools.filter((t) => Boolean(t.requires_review) === requiresReview);
+      }
+      total = tools.length;
+      page = tools.slice(offset, offset + limit);
+    }
 
     // Validate every tool against our Zod schema before sending
-    const validatedTools = tools.map(tool => toolProfileSchema.parse(tool));
+    const validatedTools = page.map(tool => toolProfileSchema.parse(tool));
 
     // ETag for simple client caching
     const etag = `W/"tools-${validatedTools.length}-${validatedTools[0]?.last_updated || ''}"`;
@@ -77,6 +124,9 @@ router.get('/', async (req, res) => {
       success: true,
       data: validatedTools,
       count: validatedTools.length,
+      total,
+      limit,
+      offset,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -154,6 +204,35 @@ router.post('/', adminAuthMiddleware, async (req, res) => {
       error: "Failed to add tool.",
       message: error instanceof Error ? error.message : "Unknown error"
     });
+  }
+});
+
+// Admin: approve a tool (sets requires_review=false, reviewed metadata)
+router.post('/:toolId/approve', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { toolId } = req.params;
+    if (!firestore) return res.status(500).json({ success: false, error: 'Firestore unavailable' });
+    const reviewed_at = new Date().toISOString();
+    const reviewer = (req as any).user?.email || (req as any).user?.sub || 'admin';
+    await firestore.collection('tools').doc(toolId).set({ requires_review: false, reviewed_at, reviewed_by: reviewer }, { merge: true });
+    return res.json({ success: true, toolId, reviewed_at });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Approve failed' });
+  }
+});
+
+// Admin: reject a tool (records rejection reason)
+router.post('/:toolId/reject', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { toolId } = req.params;
+    const { reason } = req.body || {};
+    if (!firestore) return res.status(500).json({ success: false, error: 'Firestore unavailable' });
+    const reviewed_at = new Date().toISOString();
+    const reviewer = (req as any).user?.email || (req as any).user?.sub || 'admin';
+    await firestore.collection('tools').doc(toolId).set({ requires_review: true, rejected_reason: reason || 'unspecified', reviewed_at, reviewed_by: reviewer }, { merge: true });
+    return res.json({ success: true, toolId, reviewed_at });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Reject failed' });
   }
 });
 

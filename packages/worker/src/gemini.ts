@@ -61,31 +61,26 @@ export async function callGeminiToAnalyze(textContent: string): Promise<Record<s
     }
   };
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini API request failed with status ${response.status}: ${errorBody}`);
-  }
-
-  const result = (await response.json()) as {
-    candidates?: Array<{
-      content: {
-        parts: Array<{
-          text: string;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (response.ok) {
+      const result = (await response.json()) as {
+        candidates?: Array<{
+          content: { parts: Array<{ text: string }> };
         }>;
       };
-    }>;
-  };
-
-  if (result.candidates && result.candidates.length > 0) {
-    // The API returns the structured JSON as a string in the 'text' field.
-    return JSON.parse(result.candidates[0].content.parts[0].text);
-  } else {
-    throw new Error("Invalid or empty response from Gemini API.");
+      if (result.candidates && result.candidates.length > 0) {
+        return JSON.parse(result.candidates[0].content.parts[0].text);
+      }
+      throw new Error('Invalid or empty response from Gemini API.');
+    }
+    lastErr = new Error(`Gemini API request failed with status ${response.status}: ${await response.text()}`);
+    await new Promise((r) => setTimeout(r, attempt * attempt * 300));
   }
+  throw lastErr ?? new Error('Gemini request failed');
 } 

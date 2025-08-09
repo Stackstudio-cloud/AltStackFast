@@ -3,20 +3,48 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { chromium } from 'playwright';
 import { Firestore } from '@google-cloud/firestore';
+import { existsSync } from 'fs';
 import { callGeminiToAnalyze } from './gemini';
+import * as Sentry from '@sentry/node';
 import { toolProfileSchema } from '@stackfast/schemas';
 import { getChangedTools } from './lib/github';
 
 // Load environment variables
 dotenv.config();
 
+if (process.env.SENTRY_DSN) {
+  Sentry.init({ dsn: process.env.SENTRY_DSN as string });
+}
+
 const app = express();
+// Sentry.Handlers not exported in Node SDK v8 types; skip requestHandler wiring for now
 const PORT = process.env.WORKER_PORT ?? 8080;
 
-// Initialize Firestore
+// Initialize Firestore with robust env handling
 let firestore: Firestore | null = null;
 try {
-  firestore = new Firestore();
+  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  const options: Record<string, unknown> = {};
+  if (raw) {
+    if (existsSync(raw)) {
+      // Let Firestore read credentials from file path via env
+    } else {
+      try {
+        options.credentials = JSON.parse(raw);
+      } catch {
+        try {
+          const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+          options.credentials = JSON.parse(decoded);
+        } catch {
+          try {
+            const normalized = raw.replace(/\\n/g, '\n');
+            options.credentials = JSON.parse(normalized);
+          } catch {}
+        }
+      }
+    }
+  }
+  firestore = new Firestore(options);
   console.log('✅ Firestore initialized successfully');
 } catch (error) {
   console.warn('⚠️ Firestore initialization failed:', error);
@@ -123,10 +151,16 @@ Ensure the response is structured according to the toolProfileSchema.
       };
       
       const validatedProfile = toolProfileSchema.parse(dataToValidate);
+      // provenance
+      const provenance = {
+        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        scraped_length: scrapedText.length,
+        reviewed_at: null,
+      };
 
       // 5. Save to Firestore
       if (firestore) {
-        await firestore.collection('tools').doc(toolId).set(validatedProfile, { merge: true });
+        await firestore.collection('tools').doc(toolId).set({ ...validatedProfile, ...provenance }, { merge: true });
         console.log(`💾 Saved profile to Firestore: ${toolId}`);
       }
 
@@ -169,9 +203,14 @@ Ensure the response is structured according to the toolProfileSchema.
       };
       
       const validatedProfile = toolProfileSchema.parse(dataToValidate);
+      const provenance = {
+        model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        scraped_length: 0,
+        reviewed_at: null,
+      };
 
       if (firestore) {
-        await firestore.collection('tools').doc(toolId).set(validatedProfile, { merge: true });
+        await firestore.collection('tools').doc(toolId).set({ ...validatedProfile, ...provenance }, { merge: true });
       }
 
       res.json({
