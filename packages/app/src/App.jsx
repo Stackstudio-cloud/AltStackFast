@@ -133,7 +133,7 @@ function App() {
                 try {
                   const resp = await apiFetch('/v1/blueprint', {
                     method: 'POST',
-                    body: JSON.stringify({ rawIdea: idea })
+                    body: JSON.stringify({ rawIdea: idea, stackRegistry: { tools } })
                   }, 30000)
                   setBlueprint(resp.data || resp)
                 } catch (e) {
