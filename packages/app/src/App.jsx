@@ -2,6 +2,27 @@ import React, { useState, useEffect } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { apiFetch } from './lib/apiClient'
+import { initializeApp } from 'firebase/app'
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth'
+import { getFirestore, collection, query, onSnapshot, addDoc } from 'firebase/firestore'
+
+// Firebase bootstrap (optional; enabled when globals are provided at runtime)
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'stackfast-app'
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {}
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null
+
+let firebaseApp = null
+let db = null
+let auth = null
+if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
+  try {
+    firebaseApp = initializeApp(firebaseConfig)
+    db = getFirestore(firebaseApp)
+    auth = getAuth(firebaseApp)
+  } catch (err) {
+    console.warn('Firebase init failed:', err)
+  }
+}
 
 function App() {
   const [tools, setTools] = useState([])
@@ -12,10 +33,51 @@ function App() {
   const [blueprintLoading, setBlueprintLoading] = useState(false)
   const [blueprintError, setBlueprintError] = useState(null)
   const [blueprint, setBlueprint] = useState(null)
+  // Enhanced generation + plans
+  const [generationMode, setGenerationMode] = useState('auto') // 'auto' | 'manual'
+  const [mode, setMode] = useState('single') // 'single' | 'workflow'
+  const [singleTool, setSingleTool] = useState('replit')
+  const [selectedWorkflow, setSelectedWorkflow] = useState('bolt-replit')
+  const [generatedPlan, setGeneratedPlan] = useState(null)
+  const [userId, setUserId] = useState(null)
+  const [savedPlans, setSavedPlans] = useState([])
 
   useEffect(() => {
     fetchTools()
   }, [])
+
+  // Firebase auth + saved plans listener
+  useEffect(() => {
+    if (!auth) return
+    const unsubAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid)
+      } else {
+        try {
+          if (initialAuthToken) await signInWithCustomToken(auth, initialAuthToken)
+          else await signInAnonymously(auth)
+        } catch (e) {
+          console.error('Auth failed:', e)
+        }
+      }
+    })
+    return () => unsubAuth()
+  }, [])
+
+  useEffect(() => {
+    if (!db || !userId) return
+    const plansRef = collection(db, `artifacts/${appId}/users/${userId}/plans`)
+    const q = query(plansRef)
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const plans = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))
+        setSavedPlans(plans)
+      },
+      (err) => console.error('Saved plans listener failed:', err),
+    )
+    return () => unsub()
+  }, [db, userId])
 
   const fetchTools = async () => {
     try {
@@ -136,7 +198,19 @@ function App() {
                     method: 'POST',
                     body: JSON.stringify({ rawIdea: idea, stackRegistry: { tools } })
                   }, 30000)
-                  setBlueprint(resp.data || resp)
+                  const bp = resp.data || resp
+                  setBlueprint(bp)
+                  // Capture a generated plan envelope for save/load flows
+                  const planEnvelope = {
+                    ...bp,
+                    rawIdea: idea,
+                    generationMode,
+                    mode,
+                    singleTool,
+                    selectedWorkflow,
+                    timestamp: new Date().toISOString(),
+                  }
+                  setGeneratedPlan(planEnvelope)
                 } catch (e) {
                   setBlueprintError(e.message)
                 } finally {
@@ -149,6 +223,70 @@ function App() {
               {blueprintLoading ? 'Generating…' : 'Generate'}
             </button>
           </div>
+          {/* Auto / Manual configuration */}
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-300 mb-2">Generation Mode</label>
+              <div className="flex rounded-lg overflow-hidden border border-white/20">
+                <button
+                  onClick={() => setGenerationMode('auto')}
+                  className={`flex-1 px-3 py-2 text-sm ${generationMode === 'auto' ? 'bg-blue-600 text-white' : 'bg-black/30 text-gray-300'}`}
+                >
+                  Auto
+                </button>
+                <button
+                  onClick={() => setGenerationMode('manual')}
+                  className={`flex-1 px-3 py-2 text-sm ${generationMode === 'manual' ? 'bg-blue-600 text-white' : 'bg-black/30 text-gray-300'}`}
+                >
+                  Manual
+                </button>
+              </div>
+            </div>
+            {generationMode === 'manual' && (
+              <div>
+                <label className="block text-sm text-gray-300 mb-2">Mode</label>
+                <select
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+                >
+                  <option value="single">Single Tool</option>
+                  <option value="workflow">Workflow</option>
+                </select>
+              </div>
+            )}
+          </div>
+          {generationMode === 'manual' && (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {mode === 'single' ? (
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Tool</label>
+                  <select
+                    value={singleTool}
+                    onChange={(e) => setSingleTool(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+                  >
+                    <option value="replit">Replit</option>
+                    <option value="cursor">Cursor</option>
+                    <option value="bolt">Bolt.new</option>
+                    <option value="bubble">Bubble.io</option>
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm text-gray-300 mb-2">Workflow</label>
+                  <select
+                    value={selectedWorkflow}
+                    onChange={(e) => setSelectedWorkflow(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-black/30 border border-white/20 text-white"
+                  >
+                    <option value="bolt-replit">Rapid MVP (Bolt → Replit)</option>
+                    <option value="bubble-cursor">Design‑First (Bubble → Cursor)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
           {blueprintError && (
             <div className="mt-3 text-sm text-red-300">{blueprintError}</div>
           )}
@@ -221,6 +359,66 @@ function App() {
                 </div>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Saved Plans */}
+        <div className="max-w-3xl mx-auto mb-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
+          <h3 className="text-2xl font-semibold text-white mb-3">Your Saved Plans</h3>
+          {!auth && (
+            <p className="text-gray-400 text-sm">Sign‑in not configured. Provide Firebase globals to enable save/load.</p>
+          )}
+          {auth && (
+            <>
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={async () => {
+                    if (!generatedPlan || !db || !userId) return
+                    try {
+                      const plansRef = collection(db, `artifacts/${appId}/users/${userId}/plans`)
+                      await addDoc(plansRef, generatedPlan)
+                      // eslint-disable-next-line no-alert
+                      alert('Plan saved')
+                    } catch (e) {
+                      console.error('Save failed:', e)
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+                  disabled={!generatedPlan}
+                >
+                  Save Current Plan
+                </button>
+                <span className="text-gray-300 text-sm">{savedPlans.length} saved</span>
+              </div>
+              {savedPlans.length === 0 ? (
+                <p className="text-gray-400 text-sm">No plans yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {savedPlans.map((p) => (
+                    <div key={p.id} className="bg-black/30 border border-white/10 rounded-lg p-3">
+                      <div className="text-white text-sm font-semibold truncate">{p.title || p.rawIdea || 'Untitled'}</div>
+                      <div className="text-gray-400 text-xs truncate">{p.workflow || p.recommendedWorkflow?.name || '—'}</div>
+                      <div className="mt-2 flex gap-2">
+                        <button
+                          onClick={() => {
+                            setBlueprint(p)
+                            setGeneratedPlan(p)
+                            setIdea(p.rawIdea || '')
+                            setGenerationMode(p.generationMode || 'auto')
+                            setMode(p.mode || 'single')
+                            setSingleTool(p.singleTool || 'replit')
+                            setSelectedWorkflow(p.selectedWorkflow || 'bolt-replit')
+                          }}
+                          className="px-3 py-1 rounded bg-blue-600 text-white text-xs"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 

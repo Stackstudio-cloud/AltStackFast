@@ -1,4 +1,4 @@
-## Stackfast · Workflow Architect for AI Development
+# Stackfast · Workflow Architect for AI Development
 
 Build fast, and build right. Stackfast turns product ideas into actionable, tool‑aware build plans and keeps a living, validated registry of AI development tools.
 
