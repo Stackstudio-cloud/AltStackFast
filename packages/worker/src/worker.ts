@@ -6,6 +6,7 @@ import { Firestore } from '@google-cloud/firestore';
 import { existsSync } from 'fs';
 import { callGeminiToAnalyze } from './gemini';
 import * as Sentry from '@sentry/node';
+import pino from 'pino';
 import { toolProfileSchema } from '@stackfast/schemas';
 import { getChangedTools } from './lib/github';
 
@@ -18,6 +19,7 @@ if (process.env.SENTRY_DSN) {
 
 const app = express();
 // Sentry.Handlers not exported in Node SDK v8 types; skip requestHandler wiring for now
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 const PORT = process.env.WORKER_PORT ?? 8080;
 
 // Initialize Firestore with robust env handling
@@ -45,10 +47,9 @@ try {
     }
   }
   firestore = new Firestore(options);
-  console.log('✅ Firestore initialized successfully');
+  logger.info({ msg: 'Firestore initialized' });
 } catch (error) {
-  console.warn('⚠️ Firestore initialization failed:', error);
-  console.warn('⚠️ Some features may not work without proper Google Cloud credentials');
+  logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
 
 // Middleware
@@ -80,7 +81,7 @@ app.get('/', (_, res) => {
 // Manual analysis endpoint (for testing)
 app.post('/analyze', async (req, res) => {
   try {
-    const { tool_name, url, description } = req.body;
+    const { tool_name, url, description, requestId } = req.body as { tool_name?: string; url?: string; description?: string; requestId?: string };
     const safeDescription: string = description || '';
     
     if (!tool_name || (!url && !safeDescription)) {
@@ -89,10 +90,10 @@ app.post('/analyze', async (req, res) => {
       });
     }
 
-    console.log(`🔍 Manual analysis requested for: ${tool_name}`);
+    logger.info({ msg: 'analysis requested', tool_name, requestId });
 
     // 1. Retrieve: Scrape enrichment data
-    console.log(`🌐 Scraping data from: ${url}`);
+    logger.info({ msg: 'scraping', url, requestId });
     const browser = await chromium.launch({ 
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -105,7 +106,7 @@ app.post('/analyze', async (req, res) => {
     });
     
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded' });
+      await page.goto(url || 'about:blank', { waitUntil: 'domcontentloaded' });
       
       const scrapedText = await page.evaluate(() => {
         const scripts = document.querySelectorAll('script, style, nav, footer, header');
@@ -117,7 +118,7 @@ app.post('/analyze', async (req, res) => {
       
       await browser.close();
       
-      console.log(`📄 Scraped ${scrapedText.length} characters`);
+      logger.info({ msg: 'scraped', length: scrapedText.length, requestId });
 
       // 2. Augment: Combine data into rich context
       const context = `
@@ -134,7 +135,7 @@ Ensure the response is structured according to the toolProfileSchema.
       `.trim();
 
       // 3. Generate: Call AI
-      console.log(`🤖 Calling Gemini AI for analysis...`);
+      logger.info({ msg: 'call gemini', requestId });
       const profileJson = await callGeminiToAnalyze(context);
 
       // 4. Guard: Validate response
@@ -161,7 +162,7 @@ Ensure the response is structured according to the toolProfileSchema.
       // 5. Save to Firestore
       if (firestore) {
         await firestore.collection('tools').doc(toolId).set({ ...validatedProfile, ...provenance }, { merge: true });
-        console.log(`💾 Saved profile to Firestore: ${toolId}`);
+        logger.info({ msg: 'saved profile', toolId, requestId });
       }
 
       res.json({
@@ -174,7 +175,7 @@ Ensure the response is structured according to the toolProfileSchema.
 
     } catch (scrapingError) {
       await browser.close();
-      console.warn(`⚠️ Failed to scrape ${url}:`, scrapingError);
+      logger.warn({ msg: 'scrape failed', url, err: (scrapingError as Error)?.message, requestId });
       
       // Fallback analysis
       const fallbackContext = `
@@ -223,7 +224,7 @@ Ensure the response is structured according to the toolProfileSchema.
     }
 
   } catch (error) {
-    console.error('❌ Analysis failed:', error);
+    logger.error({ msg: 'analysis failed', err: (error as Error)?.message });
     res.status(500).json({ 
       error: 'Analysis failed', 
       details: error instanceof Error ? error.message : 'Unknown error' 
@@ -260,9 +261,5 @@ app.post('/check-updates', async (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 RAG Worker server listening for jobs at http://localhost:${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/healthz`);
-  console.log(`🔍 Analysis endpoint: http://localhost:${PORT}/analyze`);
-  console.log(`🔄 Check updates: http://localhost:${PORT}/check-updates`);
-  console.log('🎯 RAG features enabled: GitHub integration, web scraping, AI analysis');
-}); 
+  logger.info({ msg: 'Worker listening', port: PORT });
+});

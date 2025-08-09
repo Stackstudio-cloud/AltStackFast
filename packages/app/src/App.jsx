@@ -55,6 +55,7 @@ function App() {
   const [adminTools, setAdminTools] = useState([])
   const [adminLoading, setAdminLoading] = useState(false)
   const [adminError, setAdminError] = useState('')
+  const showAdmin = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('admin') === '1'
 
   useEffect(() => {
     fetchTools({ reset: true })
@@ -185,11 +186,35 @@ function App() {
 
   const handleToolClick = (tool) => {
     setSelectedTool(tool)
+    try { window.location.hash = `tool-${encodeURIComponent(tool.tool_id)}` } catch {}
   }
 
   const closeModal = () => {
     setSelectedTool(null)
+    try { if (window.location.hash.startsWith('#tool-')) window.history.replaceState(null, '', window.location.pathname + window.location.search) } catch {}
   }
+
+  // Deep link: open tool modal when URL hash is #tool-<tool_id> or path /tool/:toolId
+  useEffect(() => {
+    const applyHash = () => {
+      try {
+        let id = ''
+        const h = window.location.hash || ''
+        if (h.startsWith('#tool-')) {
+          id = decodeURIComponent(h.slice('#tool-'.length))
+        } else {
+          const m = window.location.pathname.match(/^\/tool\/([^/]+)/)
+          if (m) id = decodeURIComponent(m[1])
+        }
+        if (!id) return
+        const t = tools.find((tt) => tt.tool_id === id)
+        if (t) setSelectedTool(t)
+      } catch {}
+    }
+    applyHash()
+    window.addEventListener('hashchange', applyHash)
+    return () => window.removeEventListener('hashchange', applyHash)
+  }, [tools])
 
   if (loading) {
     return (
@@ -300,7 +325,8 @@ function App() {
           </div>
         </div>
 
-        {/* Admin Panel */}
+        {/* Admin Panel (hidden unless ?admin=1 is present) */}
+        {showAdmin && (
         <div className="max-w-7xl mx-auto mb-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
           <h3 className="text-2xl font-semibold text-white mb-3">Admin Review</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -342,6 +368,7 @@ function App() {
             <p className="text-gray-400 text-sm">No pending tools.</p>
           )}
         </div>
+        )}
 
         {/* Blueprint Generator */}
         <div className="max-w-3xl mx-auto mb-12 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6">
@@ -599,9 +626,9 @@ function App() {
               className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/20 transition-all duration-300 cursor-pointer group"
             >
               <div className="flex items-start justify-between mb-4">
-                <h3 className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
+                <a href={`#tool-${tool.tool_id}`} onClick={(e) => { e.stopPropagation(); setSelectedTool(tool) }} className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
                   {tool.name || tool.tool_name}
-                </h3>
+                </a>
                 {tool.requires_review && (
                   <span className="px-2 py-1 bg-yellow-600/20 border border-yellow-500/30 rounded text-xs text-yellow-400">
                     Review

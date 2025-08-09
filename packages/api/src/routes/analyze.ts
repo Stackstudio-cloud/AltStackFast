@@ -29,10 +29,11 @@ router.post('/', async (req, res) => {
   if (!process.env.QSTASH_URL || !process.env.QSTASH_TOKEN) {
     console.warn("QStash environment variables not set. Falling back to direct worker call.");
     try {
+      const reqId = (req as any).requestId || `${Date.now()}`;
       const directResp = await fetch(WORKER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(parseResult.data),
+        body: JSON.stringify({ ...parseResult.data, requestId: reqId }),
       });
       const text = await directResp.text();
       if (!directResp.ok) {

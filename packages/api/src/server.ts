@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import * as Sentry from '@sentry/node';
+import pino from 'pino';
 import rateLimit from 'express-rate-limit';
 
 import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
@@ -29,6 +30,9 @@ if (process.env.SENTRY_DSN) {
 
 const app = express();
 // Skip Sentry request handler wiring (SDK v8 types may not include Handlers)
+
+// Simple structured logger
+const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
 // Ensure required secrets in production
 try { assertProdSecrets(); } catch (e) { console.error(String(e)); }
 
@@ -53,6 +57,12 @@ app.use(
   })
 );
 app.use(express.json());
+// RequestId correlation
+app.use((req, _res, next) => {
+  const reqId = (req.headers['x-request-id'] as string) || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+  (req as any).requestId = reqId;
+  next();
+});
 
 // --- Rate Limiting ---
 const apiLimiter = rateLimit({
@@ -92,10 +102,9 @@ try {
     }
   }
   firestore = new Firestore(firestoreOptions);
-  console.log('✅ Firestore initialized successfully');
+  logger.info({ msg: 'Firestore initialized' });
 } catch (error) {
-  console.warn('⚠️ Firestore initialization failed:', error);
-  console.warn('⚠️ Some features may not work without proper Google Cloud credentials');
+  logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
 
 export { firestore };
@@ -150,7 +159,7 @@ if (require.main === module) {
 
   // Add error handling to the server startup
   const server = app.listen(PORT, () => {
-    console.log(`🚀 API server running on http://localhost:${PORT}`);
+  logger.info({ msg: 'API server started', port: PORT });
     console.log(`📊 Health check: http://localhost:${PORT}/healthz`);
     console.log(`🔗 Queue health: http://localhost:${PORT}/queue/health`);
     console.log(`🛠️ Tools API: http://localhost:${PORT}/v1/tools`);

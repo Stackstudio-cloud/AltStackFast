@@ -59,6 +59,11 @@ router.get('/', async (req, res) => {
     // Query params: limit, offset, category, q (name substring)
     const limit = Math.max(0, Math.min(Number(req.query.limit ?? 50), 100));
     const offset = Math.max(0, Number(req.query.offset ?? 0));
+    const cursorParam = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    let cursor: { last_updated: string; tool_id?: string } | undefined;
+    if (cursorParam) {
+      try { cursor = JSON.parse(Buffer.from(cursorParam, 'base64').toString('utf-8')); } catch {}
+    }
     const category = typeof req.query.category === 'string' ? req.query.category : undefined;
     const requiresReview = typeof req.query.requires_review === 'string' ? req.query.requires_review === 'true' : undefined;
     const q = typeof req.query.q === 'string' ? req.query.q.toLowerCase() : undefined;
@@ -68,32 +73,21 @@ router.get('/', async (req, res) => {
     let total = 0;
 
     if (source === 'firestore' && firestore) {
-      // Firestore-backed listing with optional category filter and q search (in-memory for now)
-      let all: any[] = [];
-      if (category) {
-        const snap = await firestore
-          .collection('tools')
-          .where('category', 'array-contains', category)
-          .get();
-        all = snap.docs.map((d) => d.data());
-      } else {
-        const snap = await firestore.collection('tools').get();
-        all = snap.docs.map((d) => d.data());
-      }
-      if (q) {
-        all = all.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
-      }
-      if (typeof requiresReview === 'boolean') {
-        all = all.filter((t) => Boolean(t.requires_review) === requiresReview);
-      }
-      // Sort by last_updated desc if present
-      all.sort((a, b) => {
-        const ta = Date.parse(a.last_updated || '');
-        const tb = Date.parse(b.last_updated || '');
-        return (isNaN(tb) ? 0 : tb) - (isNaN(ta) ? 0 : ta);
-      });
-      total = all.length;
-      page = all.slice(offset, offset + limit);
+      // Firestore-backed listing with optional category filter; indexed order for cursor paging
+      let ref: FirebaseFirestore.Query = firestore.collection('tools')
+        .orderBy('last_updated', 'desc')
+        .orderBy('tool_id');
+      if (category) ref = ref.where('category', 'array-contains', category);
+      if (cursor?.last_updated) ref = ref.startAfter(cursor.last_updated, cursor.tool_id || '');
+      const snap = await ref.limit(limit).get();
+      let all: any[] = snap.docs.map((d) => d.data());
+      if (q) all = all.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
+      if (typeof requiresReview === 'boolean') all = all.filter((t) => Boolean(t.requires_review) === requiresReview);
+      // Use counters doc for accurate total if present
+      const countersSnap = await firestore.collection('metadata').doc('tools-counters').get();
+      const counterTotal = countersSnap.exists ? (countersSnap.data()?.total as number | undefined) : undefined;
+      total = typeof counterTotal === 'number' ? counterTotal : all.length + (offset || 0);
+      page = all;
     } else {
       // Mock data fallback
       let tools = mockTools;
@@ -120,6 +114,11 @@ router.get('/', async (req, res) => {
       return res.status(304).end();
     }
 
+    const last = validatedTools[validatedTools.length - 1];
+    const nextCursor = last?.last_updated
+      ? Buffer.from(JSON.stringify({ last_updated: last.last_updated, tool_id: last.tool_id })).toString('base64')
+      : undefined;
+
     res.status(200).json({
       success: true,
       data: validatedTools,
@@ -127,6 +126,7 @@ router.get('/', async (req, res) => {
       total,
       limit,
       offset,
+      nextCursor,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
