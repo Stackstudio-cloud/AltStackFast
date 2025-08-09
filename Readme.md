@@ -1,109 +1,157 @@
-# Stackfast · Workflow Architect
+## Stackfast · Workflow Architect for AI Development
 
-Build fast, but build right. Stackfast helps you turn product ideas into actionable, tool‑aware build plans and keeps a living registry of AI development tools.
+Build fast, and build right. Stackfast turns product ideas into actionable, tool‑aware build plans and keeps a living, validated registry of AI development tools.
 
-Live
-- Frontend: `https://stackfast.vercel.app/`
-- API: `https://stackfast-api.vercel.app/`
+Live links:
 
-## ✨ What it does
-- AI‑powered blueprint generation: turn a plain‑English idea into a structured build plan
-- Tool registry: curated + validated profiles of AI dev tools (served as JSON)
-- Superior DX: server‑side LLM calls, strict Zod validation, timeouts/retries, and rate limiting
-- Production hardened: CORS, Helmet, API contracts, and predictable error surfaces
+- **Frontend**: [stackfast.vercel.app](https://stackfast.vercel.app)
+- **API**: [stackfast-api.vercel.app](https://stackfast-api.vercel.app)
+
+---
+
+## ✨ Highlights
+
+- **Blueprints from plain English**: Structured, validated JSON plans with backend/frontend steps and workflow stages.
+- **Trusted tool registry**: Curated profiles with Zod validation, provenance, and freshness goals.
+- **Reliable by design**: Server‑side LLM, strict schemas, timeouts/retries, rate limiting, CORS/Helmet, and ETags.
+
+---
 
 ## 🧱 Architecture
-- Frontend (Vite + React)
-  - Calls our API only (no client LLM keys)
-  - Fetches tool registry and displays beautiful cards
-- API (Express on Vercel)
-  - `/v1/tools` returns validated tool profiles
-  - `/v1/blueprint` calls Gemini server‑side and returns JSON (with Zod validation)
-  - Security: CORS, Helmet, rate limiters
-- Monorepo
-  - `packages/app` – frontend
-  - `packages/api` – API
-  - `packages/schemas` – shared Zod/TS types for tools
 
-```
+- **Frontend** (`packages/app`, Vite + React)
+  - Calls the API only (no client LLM keys)
+  - Tools grid and details, blueprint generator UI
+
+- **API** (`packages/api`, Express)
+  - `GET /v1/tools` → validated tool profiles (ETagged)
+  - `POST /v1/blueprint` → strictly validated JSON blueprint
+  - Security: CORS allowlist, Helmet, rate limits, `/healthz` + `/readyz`
+
+- **Worker** (`packages/worker`)
+  - GitHub changes → scrape site with Playwright → Gemini → Zod validate → Firestore
+
+- **Schemas** (`packages/schemas`)
+  - Shared Zod models; emits `toolProfile.schema.json` during build
+
+Monorepo layout:
+
+```text
 Stackfast/
   packages/
     app/        # Vite + React UI
     api/        # Express API (serverless on Vercel)
-    schemas/    # Shared types/schemas
+    worker/     # RAG enrichment worker (containerized)
+    schemas/    # Shared Zod types; emits JSON schema
   src/          # Legacy prototype (kept for reference)
 ```
 
+---
+
 ## 🚀 Quick start (local)
-Requirements: Node 20+, npm (or pnpm/yarn)
+
+Requirements: **Node 20+**, npm (or pnpm/yarn)
 
 Install deps (from repo root):
+
 ```bash
 npm install
 ```
+
 Run frontend:
+
 ```bash
 npm run dev --workspace=@stackfast/app
 ```
+
 Run API:
+
 ```bash
 npm run dev --workspace=@stackfast/api
 ```
 
-## 🔐 Environment variables
-API (Vercel Project: stackfast‑api)
-- `GEMINI_API_KEY`: Google Generative Language API key (required)
-- `FRONTEND_ORIGIN`: Allowed origin for CORS (e.g. https://stackfast.vercel.app)
-- `GOOGLE_APPLICATION_CREDENTIALS`: service account JSON (either raw JSON or base64‑encoded JSON)
-- Optional (queueing/future): `QSTASH_URL`, `QSTASH_TOKEN`, `WORKER_URL`
+Run Worker (optional for ingestion/RAG):
 
-Frontend (Vercel Project: stackfast)
-- `VITE_API_URL`: Base URL to your API (e.g. https://stackfast-api.vercel.app)
-- `VITE_GEMINI_API_KEY`: no longer required on the client (server does LLM calls)
+```bash
+npm run dev --workspace=@stackfast/worker
+```
 
-## 📚 API Reference
-- GET `/v1/tools`
+---
+
+## 🔐 Environment
+
+See `env.example` for the latest list. Key variables:
+
+| Area | Variable | Description |
+| --- | --- | --- |
+| API | `GEMINI_API_KEY` | Google Generative Language API key (required) |
+| API | `GEMINI_MODEL` | Gemini model name, default `gemini-1.5-flash` |
+| API | `FRONTEND_ORIGIN` or `FRONTEND_ORIGINS` | Comma‑separated CORS allowlist |
+| API/Worker | `GOOGLE_APPLICATION_CREDENTIALS` | Service account JSON (raw or base64) |
+| Worker | `GITHUB_TOKEN` | Optional, raises GitHub API rate limits |
+| Worker | `WORKER_PORT` | Local worker port, default `8080` |
+| API | `WORKER_URL` | Direct worker fallback URL, default `http://localhost:8080/analyze` |
+
+Optional (queueing): `QSTASH_URL`, `QSTASH_TOKEN`.
+
+Frontend: `VITE_API_URL` (e.g., `https://stackfast-api.vercel.app`).
+
+---
+
+## 📚 API reference (essentials)
+
+- **GET** `/v1/tools`
   - Response: `{ success: true, data: ToolProfile[], count, timestamp }`
-- POST `/v1/blueprint`
+
+- **POST** `/v1/blueprint`
   - Body: `{ rawIdea: string, stackRegistry?: any }`
   - Returns strictly validated JSON blueprint
-- GET `/healthz` → `ok`
 
-## ☁️ Deployment (Vercel)
-We use two Vercel projects for clarity and reliability.
+- **Health**: `GET /healthz` → `ok`, `GET /readyz` → `{ ok, firestore }`
 
-Frontend project (packages/app)
-- Framework: Vite
-- Output: `dist` (handled by @vercel/static-build)
-- `vercel.json` in `packages/app` rewrites `/api/*` to your API if desired
+---
 
-API project (packages/api)
-- Root Directory: `packages/api`
-- Install Command: `cd ../.. && npm install`
-- Build/Output: leave empty (we provide config in `packages/api/vercel.json` or rely on zero‑config with `api/` entry)
-- CORS: set `FRONTEND_ORIGIN`
+## 🧪 Quality & CI
 
-## 🧪 Quality & Observability
-- Zod validation on inputs and outputs
-- Timeouts + retries around LLM calls
-- Helmet + CORS + rate limiting
-- Clear error payloads (no HTML surprises in JSON)
+- Lint (warnings fail CI):
+
+```bash
+npm run lint
+```
+
+- Tests:
+
+```bash
+npm run test
+```
+
+- Build all:
+
+```bash
+npm run build
+```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs install → lint → build → tests on Node 20.
+
+---
 
 ## 🗺️ Roadmap (high‑signal)
-- Frontend/UX
-  - Tool details page, deep links, and faceted filtering
-  - SWR/React Query for caching and optimistic UX
-- AI/Worker
-  - Enrichment worker (scrape + analyze) and provenance
-  - Caching of blueprints + streaming responses
-- Platform/ops
-  - CI (typecheck/lint/test) + preview URLs
-  - Sentry for FE + API
-  - Public read‑only API with rate limits
+
+- **Catalog**: Firestore as source of truth, faceted search, details pages with deep links.
+- **Ingestion (Worker)**: Scheduling, provenance, robust retries/backoff, human‑in‑the‑loop review.
+- **Blueprints**: Streaming UI, saved/sharable plans, small template library.
+- **Contracts**: Publish OpenAPI + JSON Schema; read‑only public API with rate limits; MCP parity.
+- **Ops**: Sentry (FE+API), structured logs, dashboards, clear runbooks.
+
+---
 
 ## 🤝 Contributing
-- Open an issue with “feature” or “bug” label
+
+- Open an issue with “feature” or “bug”
 - PRs welcome—keep edits focused and typed
 
+---
+
 ## 📝 License
-MIT (see LICENSE if present)
+
+MIT (see `LICENSE` if present)
