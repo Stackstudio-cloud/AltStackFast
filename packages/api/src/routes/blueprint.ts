@@ -23,7 +23,15 @@ export const blueprintSchema = z.object({
     .default({ name: 'Recommended Workflow', stages: [], reasoning: '' }),
   recommendedBackend: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional(),
   recommendedFrontend: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional(),
-  recommendedBoilerplate: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional()
+  recommendedBoilerplate: z.object({ name: z.string(), reasoning: z.string().optional().default('') }).optional(),
+  marketGapAnalysis: z
+    .object({
+      segments: z.array(z.string()).default([]),
+      competitors: z.array(z.string()).default([]),
+      gaps: z.array(z.string()).default([]),
+      validationPlan: z.array(z.string()).default([]),
+    })
+    .optional()
 });
 
 const callGeminiWithRetry = async (apiUrl: string, payload: any, { attempts = 2, timeoutMs = 30000 }: { attempts?: number; timeoutMs?: number }) => {
@@ -79,7 +87,7 @@ router.post('/', async (req, res) => {
   }
 
   const stackContext = JSON.stringify(stackRegistry ?? {}, null, 2);
-  const metaPrompt = `You are a world-class software architect. A user provided an app idea. You also have a stack registry of tools.\n\nReturn ONLY valid JSON with the following shape:\n{\n  "title": string,\n  "techStack": string,\n  "backendLogic": string[],\n  "frontendLogic": string[],\n  "recommendedWorkflow": { "name": string, "stages": string[], "reasoning": string } ,\n  "recommendedBackend"?: { "name": string, "reasoning": string },\n  "recommendedFrontend"?: { "name": string, "reasoning": string },\n  "recommendedBoilerplate"?: { "name": string, "reasoning": string }\n}\n\nUser Idea: ${rawIdea}\n\nStack Registry (summarize to what matters):\n${stackContext}\n\nStrongly prefer providing concrete workflow stages and at least 3 bullets for backendLogic and 3 bullets for frontendLogic.`;
+  const metaPrompt = `You are a world-class software architect. A user provided an app idea. You also have a stack registry of tools.\n\nReturn ONLY valid JSON with the following shape (no prose outside JSON):\n{\n  "title": string,\n  "techStack": string,\n  "backendLogic": string[],\n  "frontendLogic": string[],\n  "recommendedWorkflow": { "name": string, "stages": string[], "reasoning": string },\n  "recommendedBackend"?: { "name": string, "reasoning": string },\n  "recommendedFrontend"?: { "name": string, "reasoning": string },\n  "recommendedBoilerplate"?: { "name": string, "reasoning": string },\n  "marketGapAnalysis"?: { "segments": string[], "competitors": string[], "gaps": string[], "validationPlan": string[] }\n}\n\nConstraints:\n- Provide at least 5 bullets each for backendLogic and frontendLogic.\n- Provide 4-6 concrete workflow stages with short imperative names.\n- If marketGapAnalysis is relevant, include 3-5 bullets per field.\n\nUser Idea: ${rawIdea}\n\nStack Registry (summarize to what matters):\n${stackContext}`;
 
   const payload = {
     contents: [{ role: 'user', parts: [{ text: metaPrompt }] }],
@@ -104,16 +112,34 @@ router.post('/', async (req, res) => {
 
     safe = {
       ...safe,
-      backendLogic: ensureMinItems(safe.backendLogic, 3, [
+      backendLogic: ensureMinItems(safe.backendLogic, 5, [
         'Design database schema and migrations',
         'Implement authentication and authorization',
         'Expose REST endpoints for core features'
       ]),
-      frontendLogic: ensureMinItems(safe.frontendLogic, 3, [
+      frontendLogic: ensureMinItems(safe.frontendLogic, 5, [
         'Build main dashboard and navigation layout',
         'Implement forms with validation for core flows',
         'Integrate API calls with loading and error states'
       ]),
+      recommendedWorkflow: {
+        name: safe.recommendedWorkflow?.name || 'Recommended Workflow',
+        reasoning: safe.recommendedWorkflow?.reasoning || '',
+        stages: ensureMinItems(safe.recommendedWorkflow?.stages, 4, [
+          'Plan and scope MVP',
+          'Implement core backend services',
+          'Build primary frontend screens',
+          'Integrate and test end-to-end'
+        ]),
+      },
+      marketGapAnalysis: safe.marketGapAnalysis
+        ? {
+            segments: ensureMinItems(safe.marketGapAnalysis.segments, 3, ['Early adopters', 'SMBs', 'Enterprise teams']),
+            competitors: ensureMinItems(safe.marketGapAnalysis.competitors, 3, ['Manual workflows', 'General-purpose tools', 'Internal tooling']),
+            gaps: ensureMinItems(safe.marketGapAnalysis.gaps, 3, ['Fragmented process', 'High switching cost', 'Poor automation']),
+            validationPlan: ensureMinItems(safe.marketGapAnalysis.validationPlan, 3, ['Landing page + waitlist', 'User interviews', 'Paid pilot with 5 teams']),
+          }
+        : undefined,
     };
 
     return res.status(200).json({ success: true, data: safe });

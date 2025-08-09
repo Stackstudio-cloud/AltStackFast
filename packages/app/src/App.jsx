@@ -188,6 +188,37 @@ function App() {
                   </div>
                 </div>
               </div>
+              {blueprint.marketGapAnalysis && (
+                <div className="bg-black/30 border border-white/10 rounded-lg p-4 md:col-span-2">
+                  <h4 className="text-white font-semibold mb-2">Market Gap Analysis</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-400 mb-1">Segments</p>
+                      <ul className="list-disc list-inside text-gray-300 space-y-1">
+                        {(blueprint.marketGapAnalysis.segments || []).map((x, i) => <li key={i}>{x}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-1">Competitors</p>
+                      <ul className="list-disc list-inside text-gray-300 space-y-1">
+                        {(blueprint.marketGapAnalysis.competitors || []).map((x, i) => <li key={i}>{x}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-1">Gaps</p>
+                      <ul className="list-disc list-inside text-gray-300 space-y-1">
+                        {(blueprint.marketGapAnalysis.gaps || []).map((x, i) => <li key={i}>{x}</li>)}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-1">Validation Plan</p>
+                      <ul className="list-disc list-inside text-gray-300 space-y-1">
+                        {(blueprint.marketGapAnalysis.validationPlan || []).map((x, i) => <li key={i}>{x}</li>)}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
