@@ -1,0 +1,85 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Stackfast ToolProfile",
+    "version": "1.0.0"
+  },
+  "components": {
+    "schemas": {
+      "ToolProfile": {
+        "type": "object",
+        "properties": {
+          "tool_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "category": {
+            "type": "array"
+          },
+          "notable_strengths": {
+            "type": "string"
+          },
+          "known_limitations": {
+            "type": "string"
+          },
+          "output_types": {
+            "type": "string"
+          },
+          "integrations": {
+            "type": "string"
+          },
+          "license": {
+            "type": "string"
+          },
+          "maturity_score": {
+            "type": "string"
+          },
+          "popularity_score": {
+            "type": "string"
+          },
+          "last_updated": {
+            "type": "string"
+          },
+          "schema_version": {
+            "type": "string"
+          },
+          "requires_review": {
+            "type": "string"
+          },
+          "source_url": {
+            "type": "string"
+          },
+          "source_description": {
+            "type": "string"
+          },
+          "scraping_failed": {
+            "type": "string"
+          },
+          "established": {
+            "type": "string"
+          },
+          "default_use_case": {
+            "type": "string"
+          },
+          "llm_backends": {
+            "type": "string"
+          },
+          "reviewed_at": {
+            "type": "string"
+          },
+          "reviewed_by": {
+            "type": "string"
+          },
+          "rejected_reason": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
