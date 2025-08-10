@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { firestore } from '../server';
+import { FieldValue } from '@google-cloud/firestore';
 import { toolProfileSchema } from '@stackfast/schemas';
 import { adminAuthMiddleware } from '../middleware/auth';
 
@@ -187,7 +188,12 @@ router.post('/', adminAuthMiddleware, async (req, res) => {
     // Save to Firestore (if available)
     if (firestore) {
       const docRef = firestore.collection('tools').doc(validatedTool.tool_id);
-      await docRef.set(validatedTool);
+      const existed = (await docRef.get()).exists;
+      await docRef.set(validatedTool, { merge: true });
+      if (!existed) {
+        const countersRef = firestore.collection('metadata').doc('tools-counters');
+        await countersRef.set({ total: FieldValue.increment(1), updated_at: new Date() }, { merge: true });
+      }
     } else {
       console.warn('⚠️ Firestore not available - tool not saved to database');
     }

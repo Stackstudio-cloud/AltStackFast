@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
 import { chromium } from 'playwright';
-import { Firestore } from '@google-cloud/firestore';
+import { Firestore, FieldValue } from '@google-cloud/firestore';
 import { existsSync } from 'fs';
 import { callGeminiToAnalyze } from './gemini';
 import * as Sentry from '@sentry/node';
@@ -161,7 +161,12 @@ Ensure the response is structured according to the toolProfileSchema.
 
       // 5. Save to Firestore
       if (firestore) {
-        await firestore.collection('tools').doc(toolId).set({ ...validatedProfile, ...provenance }, { merge: true });
+        const ref = firestore.collection('tools').doc(toolId);
+        const existed = (await ref.get()).exists;
+        await ref.set({ ...validatedProfile, ...provenance }, { merge: true });
+        if (!existed) {
+          await firestore.collection('metadata').doc('tools-counters').set({ total: FieldValue.increment(1), updated_at: new Date() }, { merge: true });
+        }
         logger.info({ msg: 'saved profile', toolId, requestId });
       }
 
@@ -211,7 +216,12 @@ Ensure the response is structured according to the toolProfileSchema.
       };
 
       if (firestore) {
-        await firestore.collection('tools').doc(toolId).set({ ...validatedProfile, ...provenance }, { merge: true });
+        const ref = firestore.collection('tools').doc(toolId);
+        const existed = (await ref.get()).exists;
+        await ref.set({ ...validatedProfile, ...provenance }, { merge: true });
+        if (!existed) {
+          await firestore.collection('metadata').doc('tools-counters').set({ total: FieldValue.increment(1), updated_at: new Date() }, { merge: true });
+        }
       }
 
       res.json({

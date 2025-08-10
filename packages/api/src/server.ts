@@ -87,6 +87,15 @@ const apiLimiter = rateLimit({
 });
 app.use('/v1/', apiLimiter); // Apply rate limiting to all v1 routes
 
+// Stricter limits for LLM-heavy endpoints
+const blueprintLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/v1/blueprint', blueprintLimiter);
+
 // Initialize Firestore with robust env handling
 let firestore: Firestore | null = null;
 try {
