@@ -4,8 +4,11 @@ import { existsSync } from 'fs';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
-import * as Sentry from '@sentry/node';
-import pino from 'pino';
+// Optional requires to avoid hard dependency in serverless builds
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const tryRequire = (name: string): any => { try { return require(name); } catch { return null; } };
+const Sentry = tryRequire('@sentry/node');
+const pino = tryRequire('pino');
 import rateLimit from 'express-rate-limit';
 
 import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
@@ -24,7 +27,7 @@ try {
 }
 
 // Sentry init (no-op if DSN missing)
-if (process.env.SENTRY_DSN) {
+if (Sentry && process.env.SENTRY_DSN) {
   Sentry.init({ dsn: process.env.SENTRY_DSN });
 }
 
@@ -32,7 +35,11 @@ const app = express();
 // Skip Sentry request handler wiring (SDK v8 types may not include Handlers)
 
 // Simple structured logger
-const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+const logger = pino ? pino({ level: process.env.LOG_LEVEL || 'info' }) : {
+  info: console.log,
+  warn: console.warn,
+  error: console.error,
+};
 // Ensure required secrets in production
 try { assertProdSecrets(); } catch (e) { console.error(String(e)); }
 
@@ -61,6 +68,13 @@ app.use(express.json());
 app.use((req, _res, next) => {
   const reqId = (req.headers['x-request-id'] as string) || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
   (req as any).requestId = reqId;
+  next();
+});
+
+// Mirror requestId on responses
+app.use((req, res, next) => {
+  const reqId = (req as any).requestId as string | undefined;
+  if (reqId) res.setHeader('x-request-id', reqId);
   next();
 });
 
@@ -141,6 +155,18 @@ app.get('/queue/health', (_, res) => {
   });
 });
 
+// Debug endpoint (non-sensitive): check basic config presence
+app.get('/_debug/config', (_req, res) => {
+  res.json({
+    success: true,
+    node: process.version,
+    tools_source: (process.env.TOOLS_SOURCE || 'mock'),
+    gemini_configured: Boolean(process.env.GEMINI_API_KEY),
+    sentry_configured: Boolean(process.env.SENTRY_DSN),
+    env: process.env.NODE_ENV || 'development',
+  });
+});
+
 // Root endpoint for the entire app
 app.get('/', (_, res) => {
   res.json({
@@ -152,6 +178,19 @@ app.get('/', (_, res) => {
 
 // Export the app for Vercel
 export default app;
+
+// Error handler (last)
+app.use((err: unknown, req: any, res: any, _next: any) => {
+  const requestId = req?.requestId;
+  try {
+    // log structured error
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const pino = require('pino');
+    const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
+    logger.error({ msg: 'unhandled error', err: (err as Error)?.message, requestId });
+  } catch {}
+  res.status(500).json({ success: false, error: 'Internal Server Error', requestId });
+});
 
 // Only start the server if this file is run directly (not imported)
 if (require.main === module) {
