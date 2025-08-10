@@ -35,6 +35,7 @@ function App() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [reviewFilter, setReviewFilter] = useState('') // '', 'true', 'false'
   const [selectedTool, setSelectedTool] = useState(null)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [idea, setIdea] = useState('')
   const [blueprintLoading, setBlueprintLoading] = useState(false)
   const [blueprintError, setBlueprintError] = useState(null)
@@ -699,6 +700,25 @@ function App() {
                 >
                   ×
                 </button>
+              </div>
+
+              <div className="flex items-center gap-3 mb-4">
+                <button
+                  onClick={async () => {
+                    try {
+                      const url = `${window.location.origin}/tool/${encodeURIComponent(selectedTool.tool_id)}`
+                      await navigator.clipboard.writeText(url)
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 2000)
+                    } catch (e) {
+                      console.error('Copy failed', e)
+                    }
+                  }}
+                  className="px-3 py-1 rounded bg-blue-600 text-white text-sm"
+                >
+                  Copy link
+                </button>
+                {linkCopied && <span className="text-green-400 text-sm">Copied!</span>}
               </div>
 
               <div className="space-y-6">

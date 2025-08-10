@@ -15,6 +15,14 @@ describe('API health endpoints', () => {
     expect(res.status).toBeLessThan(600);
     expect(res.headers['content-type']).toMatch(/json/);
   });
+
+  it('GET /v1/tools (firestore mock path) returns shape', async () => {
+    const res = await request(app).get('/v1/tools?limit=1');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('success', true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(typeof res.body.count).toBe('number');
+  });
 });
 
 

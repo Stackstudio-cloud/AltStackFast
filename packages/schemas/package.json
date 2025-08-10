@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node -e \"const {toolProfileSchema}=require('./dist/index.js'); const fs=require('fs'); const {zodToJsonSchema}=require('zod-to-json-schema'); fs.writeFileSync(require('path').join(process.cwd(),'../..','toolProfile.schema.json'), JSON.stringify(zodToJsonSchema(toolProfileSchema, 'ToolProfile', { name: 'ToolProfile' }), null, 2)); console.log('Wrote toolProfile.schema.json');\""
+    "build": "tsc -p tsconfig.json && node -e \"const {toolProfileSchema, toolProfileOpenApi}=require('./dist/index.js'); const fs=require('fs'); const path=require('path'); const {zodToJsonSchema}=require('zod-to-json-schema'); fs.writeFileSync(path.join(process.cwd(),'../..','toolProfile.schema.json'), JSON.stringify(zodToJsonSchema(toolProfileSchema, 'ToolProfile', { name: 'ToolProfile' }), null, 2)); fs.writeFileSync(path.join(process.cwd(),'../..','openapi.json'), JSON.stringify(toolProfileOpenApi(), null, 2)); console.log('Wrote toolProfile.schema.json and openapi.json');\""
   },
   "files": ["dist"],
   "dependencies": {
