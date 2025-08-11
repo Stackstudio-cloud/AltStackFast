@@ -1,0 +1,389 @@
+openapi: 3.0.3
+info:
+  title: Developer Tools API
+  description: Comprehensive API for modern development tools information
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.example.com/api
+    description: Production server
+  - url: http://localhost:5001/api
+    description: Development server
+
+paths:
+  /tools:
+    get:
+      summary: Get all tools
+      description: Retrieve a paginated list of developer tools with optional filtering
+      parameters:
+        - name: category
+          in: query
+          description: Filter by category (partial match)
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search in name, description, and features
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Items per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: summary
+          in: query
+          description: Return summary view only
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeveloperTool'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    post:
+      summary: Create a new tool
+      description: Create a new developer tool (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeveloperToolInput'
+      responses:
+        '201':
+          description: Tool created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeveloperTool'
+        '400':
+          description: Bad request
+        '409':
+          description: Tool already exists
+
+  /tools/{id}:
+    get:
+      summary: Get tool by ID
+      description: Retrieve detailed information about a specific tool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tool ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeveloperTool'
+        '404':
+          description: Tool not found
+    put:
+      summary: Update tool
+      description: Update an existing tool (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tool ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeveloperToolInput'
+      responses:
+        '200':
+          description: Tool updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeveloperTool'
+        '404':
+          description: Tool not found
+    delete:
+      summary: Delete tool
+      description: Delete a tool (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Tool ID
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Tool deleted successfully
+        '404':
+          description: Tool not found
+
+  /tools/categories:
+    get:
+      summary: Get all categories
+      description: Retrieve all unique tool categories
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      type: string
+
+  /tools/search:
+    get:
+      summary: Advanced search
+      description: Perform advanced search with multiple filters
+      parameters:
+        - name: q
+          in: query
+          description: Search query text
+          schema:
+            type: string
+        - name: category
+          in: query
+          description: Filter by category
+          schema:
+            type: string
+        - name: min_maturity
+          in: query
+          description: Minimum maturity score (1-10)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        - name: min_popularity
+          in: query
+          description: Minimum popularity score (1-10)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+        - name: frameworks
+          in: query
+          description: Comma-separated list of frameworks
+          schema:
+            type: string
+        - name: languages
+          in: query
+          description: Comma-separated list of programming languages
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DeveloperTool'
+                  count:
+                    type: integer
+
+  /tools/stats:
+    get:
+      summary: Get API statistics
+      description: Retrieve statistics about the API data
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_tools:
+                    type: integer
+                  total_categories:
+                    type: integer
+                  category_breakdown:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+components:
+  schemas:
+    DeveloperTool:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier
+        name:
+          type: string
+          description: Tool name
+        category:
+          type: string
+          description: Tool category
+        description:
+          type: string
+          description: Tool description
+        url:
+          type: string
+          description: Official website URL
+        frameworks:
+          type: array
+          items:
+            type: string
+          description: Supported frameworks
+        supported_languages:
+          type: array
+          items:
+            type: string
+          description: Programming languages supported
+        features:
+          type: array
+          items:
+            type: string
+          description: Key features
+        native_integrations:
+          type: array
+          items:
+            type: string
+          description: Built-in integrations
+        verified_integrations:
+          type: array
+          items:
+            type: string
+          description: Third-party verified integrations
+        notable_strengths:
+          type: array
+          items:
+            type: string
+          description: Key strengths
+        known_limitations:
+          type: array
+          items:
+            type: string
+          description: Known limitations
+        maturity_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Maturity rating
+        popularity_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+          description: Popularity rating
+        pricing:
+          type: string
+          description: Pricing information
+        created_at:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    DeveloperToolInput:
+      type: object
+      required:
+        - name
+        - category
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        url:
+          type: string
+        frameworks:
+          type: array
+          items:
+            type: string
+        supported_languages:
+          type: array
+          items:
+            type: string
+        features:
+          type: array
+          items:
+            type: string
+        native_integrations:
+          type: array
+          items:
+            type: string
+        verified_integrations:
+          type: array
+          items:
+            type: string
+        notable_strengths:
+          type: array
+          items:
+            type: string
+        known_limitations:
+          type: array
+          items:
+            type: string
+        maturity_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+        popularity_score:
+          type: integer
+          minimum: 1
+          maximum: 10
+        pricing:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
+

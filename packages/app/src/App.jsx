@@ -5,6 +5,7 @@ import { apiFetch } from './lib/apiClient'
 import { initializeApp } from 'firebase/app'
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth'
 import { getFirestore, collection, query, onSnapshot, addDoc } from 'firebase/firestore'
+import CompatibilityList from './components/CompatibilityList.jsx'
 
 // Firebase bootstrap (optional; enabled when globals are provided at runtime)
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'stackfast-app'
@@ -627,9 +628,18 @@ function App() {
               className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-6 hover:bg-white/20 transition-all duration-300 cursor-pointer group"
             >
               <div className="flex items-start justify-between mb-4">
-                <a href={`#tool-${tool.tool_id}`} onClick={(e) => { e.stopPropagation(); setSelectedTool(tool) }} className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
-                  {tool.name || tool.tool_name}
-                </a>
+                <div className="space-y-1">
+                  <a href={`#tool-${tool.tool_id}`} onClick={(e) => { e.stopPropagation(); setSelectedTool(tool) }} className="text-xl font-semibold text-white group-hover:text-blue-300 transition-colors">
+                    {tool.name || tool.tool_name}
+                  </a>
+                  {tool.compatibility_summary?.top_rank_score >= 0.7 && (
+                    <div className="mt-1">
+                      <span className="px-2 py-1 bg-green-600/20 border border-green-500/30 rounded text-xs text-green-400">
+                        Highly compatible
+                      </span>
+                    </div>
+                  )}
+                </div>
                 {tool.requires_review && (
                   <span className="px-2 py-1 bg-yellow-600/20 border border-yellow-500/30 rounded text-xs text-yellow-400">
                     Review
@@ -725,6 +735,11 @@ function App() {
                 <div>
                   <h3 className="text-lg font-semibold text-white mb-2">Description</h3>
                   <p className="text-gray-300">{selectedTool.description}</p>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">Compatibility</h3>
+                  <CompatibilityList toolId={selectedTool.tool_id} />
                 </div>
 
                 {selectedTool.features && (

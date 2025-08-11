@@ -16,6 +16,7 @@ import toolsRouter from './routes/tools';
 import analyzeRouter from './routes/analyze';
 import mcpRouter from './routes/mcp'; // Import the new MCP route
 import blueprintRouter from './routes/blueprint';
+import compatibilityRouter from './routes/compatibility';
 
 
 // Load environment variables - try .env.local first, then fallback to default
@@ -136,6 +137,7 @@ export { firestore };
 app.use('/v1/tools', toolsRouter);
 app.use('/v1/analyze', analyzeRouter);
 app.use('/v1/blueprint', blueprintRouter);
+app.use('/v1/compatibility', compatibilityRouter);
 app.use('/mcp/v1', mcpRouter);
 
 // Health check and readiness endpoints

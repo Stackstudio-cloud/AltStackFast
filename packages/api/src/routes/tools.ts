@@ -7,7 +7,7 @@ import { adminAuthMiddleware } from '../middleware/auth';
 const router = Router();
 
 // Mock data for Week 1
-const mockTools = [
+export const mockTools = [
   {
     tool_id: "replit",
     name: "Replit",
