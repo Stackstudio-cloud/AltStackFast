@@ -12,6 +12,16 @@ const pino = tryRequire('pino');
 import rateLimit from 'express-rate-limit';
 
 // Helper to pick the first non-empty env var from a list
+const CREDS_ENV_KEYS = [
+  'GOOGLE_APPLICATION_CREDENTIALS_JSON',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GOOGLE_CREDENTIALS',
+  'GCP_SERVICE_ACCOUNT',
+  'GCP_CREDENTIALS',
+  'FIREBASE_SERVICE_ACCOUNT',
+  'FIREBASE_ADMIN_CREDENTIALS',
+];
+
 const pickFirstEnv = (keys: string[]): { key: string; value: string } | null => {
   for (const key of keys) {
     const v = process.env[key];
@@ -112,15 +122,7 @@ app.use('/v1/blueprint', blueprintLimiter);
 let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
 try {
-  const candidate = pickFirstEnv([
-    'GOOGLE_APPLICATION_CREDENTIALS_JSON',
-    'GOOGLE_APPLICATION_CREDENTIALS',
-    'GOOGLE_CREDENTIALS',
-    'GCP_SERVICE_ACCOUNT',
-    'GCP_CREDENTIALS',
-    'FIREBASE_SERVICE_ACCOUNT',
-    'FIREBASE_ADMIN_CREDENTIALS',
-  ]);
+  const candidate = pickFirstEnv(CREDS_ENV_KEYS);
   const raw = candidate?.value.trim();
   let firestoreOptions: Record<string, unknown> = {};
   if (raw) {
@@ -199,6 +201,10 @@ app.get('/queue/health', (_, res) => {
 
 // Debug endpoint (non-sensitive): check basic config presence
 app.get('/_debug/config', (_req, res) => {
+  const presentKeys = CREDS_ENV_KEYS.filter((k) => {
+    const v = process.env[k];
+    return typeof v === 'string' && v.trim().length > 0;
+  });
   res.json({
     success: true,
     node: process.version,
@@ -207,6 +213,7 @@ app.get('/_debug/config', (_req, res) => {
     sentry_configured: Boolean(process.env.SENTRY_DSN),
     env: process.env.NODE_ENV || 'development',
     firestore_credential_source: firestoreCredentialSource,
+    firestore_credential_env_keys_present: presentKeys,
   });
 });
 
