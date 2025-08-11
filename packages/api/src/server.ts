@@ -32,6 +32,13 @@ const pickFirstEnv = (keys: string[]): { key: string; value: string } | null => 
   return null;
 };
 
+const cleanRawCredString = (value: string): string => {
+  let cleaned = value.trim();
+  // Strip wrapping single/double quotes if present
+  cleaned = cleaned.replace(/^['"]+|['"]+$/g, '');
+  return cleaned;
+};
+
 import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
 import toolsRouter from './routes/tools';
 import analyzeRouter from './routes/analyze';
@@ -129,7 +136,7 @@ try {
     .filter((e): e is { key: string; value: string } => typeof e.value === 'string' && e.value.trim().length > 0);
 
   for (const { key, value } of candidates) {
-    const raw = value.trim();
+    const raw = cleanRawCredString(value);
     // If it's a path, let ADC pick it up (only for GOOGLE_APPLICATION_CREDENTIALS)
     if (key === 'GOOGLE_APPLICATION_CREDENTIALS' && existsSync(raw)) {
       firestoreCredentialSource = `env-path:${key}`;
