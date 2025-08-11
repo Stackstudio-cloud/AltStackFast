@@ -108,20 +108,26 @@ try {
       // Leave options empty; the library will read the file path from env
     } else {
       // Try raw JSON
+      let parsed: any | null = null;
       try {
-        firestoreOptions.credentials = JSON.parse(raw);
+        parsed = JSON.parse(raw);
       } catch {
         // Try base64 → JSON
         try {
           const decoded = Buffer.from(raw, 'base64').toString('utf-8');
-          firestoreOptions.credentials = JSON.parse(decoded);
+          parsed = JSON.parse(decoded);
         } catch {
           // Try newline-normalized JSON
           try {
             const normalized = raw.replace(/\\n/g, '\n');
-            firestoreOptions.credentials = JSON.parse(normalized);
+            parsed = JSON.parse(normalized);
           } catch {}
         }
+      }
+      if (parsed) {
+        // Prevent google-auth-library from treating env var as a file path
+        delete (process as any).env.GOOGLE_APPLICATION_CREDENTIALS;
+        firestoreOptions.credentials = parsed;
       }
     }
   }
