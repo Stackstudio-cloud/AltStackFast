@@ -122,44 +122,61 @@ app.use('/v1/blueprint', blueprintLimiter);
 let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
 try {
-  const candidate = pickFirstEnv(CREDS_ENV_KEYS);
-  const raw = candidate?.value.trim();
   let firestoreOptions: Record<string, unknown> = {};
-  if (raw) {
+  let usedCredentialEnvKey: string | null = null;
+  const candidates = CREDS_ENV_KEYS
+    .map((key) => ({ key, value: process.env[key] }))
+    .filter((e): e is { key: string; value: string } => typeof e.value === 'string' && e.value.trim().length > 0);
+
+  for (const { key, value } of candidates) {
+    const raw = value.trim();
     // If it's a path, let ADC pick it up (only for GOOGLE_APPLICATION_CREDENTIALS)
-    if (candidate?.key === 'GOOGLE_APPLICATION_CREDENTIALS' && existsSync(raw)) {
-      // Leave options empty; the library will read the file path from env
-      firestoreCredentialSource = `env-path:${candidate.key}`;
-    } else {
-      // Try raw JSON
-      let parsed: any | null = null;
-      try {
+    if (key === 'GOOGLE_APPLICATION_CREDENTIALS' && existsSync(raw)) {
+      firestoreCredentialSource = `env-path:${key}`;
+      usedCredentialEnvKey = key;
+      // Leave options empty so ADC reads the file path
+      break;
+    }
+    // Try raw JSON
+    let parsed: any | null = null;
+    try {
+      if (raw.startsWith('{')) {
         parsed = JSON.parse(raw);
-        firestoreCredentialSource = `env-json:${candidate?.key}`;
+        firestoreCredentialSource = `env-json:${key}`;
+      } else {
+        throw new Error('not-json');
+      }
+    } catch {
+      // Try base64 → JSON (support url-safe variants)
+      try {
+        const normalizedBase64 = raw.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        const decoded = Buffer.from(normalizedBase64, 'base64').toString('utf-8');
+        parsed = JSON.parse(decoded);
+        firestoreCredentialSource = `env-base64:${key}`;
       } catch {
-        // Try base64 → JSON
+        // Try newline-normalized JSON
         try {
-          const decoded = Buffer.from(raw, 'base64').toString('utf-8');
-          parsed = JSON.parse(decoded);
-          firestoreCredentialSource = `env-base64:${candidate?.key}`;
+          const normalized = raw.replace(/\\n/g, '\n');
+          parsed = JSON.parse(normalized);
+          firestoreCredentialSource = `env-normalized-json:${key}`;
         } catch {
-          // Try newline-normalized JSON
-          try {
-            const normalized = raw.replace(/\\n/g, '\n');
-            parsed = JSON.parse(normalized);
-            firestoreCredentialSource = `env-normalized-json:${candidate?.key}`;
-          } catch {}
+          // no-op; try next key
         }
       }
-      if (parsed) {
-        // Prevent google-auth-library from treating env var as a file path
-        delete (process as any).env.GOOGLE_APPLICATION_CREDENTIALS;
-        firestoreOptions.credentials = parsed;
+    }
+    if (parsed) {
+      usedCredentialEnvKey = key;
+      // Prevent google-auth-library from treating env var as a file path
+      delete (process as any).env.GOOGLE_APPLICATION_CREDENTIALS;
+      firestoreOptions.credentials = parsed;
+      if (parsed.project_id && typeof parsed.project_id === 'string') {
+        (firestoreOptions as any).projectId = parsed.project_id;
       }
+      break;
     }
   }
   firestore = new Firestore(firestoreOptions);
-  logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource });
+  logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource, usedEnvKey: usedCredentialEnvKey });
 } catch (error) {
   logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
