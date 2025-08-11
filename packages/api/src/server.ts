@@ -99,6 +99,7 @@ app.use('/v1/blueprint', blueprintLimiter);
 
 // Initialize Firestore with robust env handling
 let firestore: Firestore | null = null;
+let firestoreCredentialSource: string = 'none';
 try {
   const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
   let firestoreOptions: Record<string, unknown> = {};
@@ -106,21 +107,25 @@ try {
     // If it's a path, let ADC pick it up
     if (existsSync(raw)) {
       // Leave options empty; the library will read the file path from env
+      firestoreCredentialSource = 'env-path';
     } else {
       // Try raw JSON
       let parsed: any | null = null;
       try {
         parsed = JSON.parse(raw);
+        firestoreCredentialSource = 'env-json';
       } catch {
         // Try base64 → JSON
         try {
           const decoded = Buffer.from(raw, 'base64').toString('utf-8');
           parsed = JSON.parse(decoded);
+          firestoreCredentialSource = 'env-base64';
         } catch {
           // Try newline-normalized JSON
           try {
             const normalized = raw.replace(/\\n/g, '\n');
             parsed = JSON.parse(normalized);
+            firestoreCredentialSource = 'env-normalized-json';
           } catch {}
         }
       }
@@ -132,7 +137,7 @@ try {
     }
   }
   firestore = new Firestore(firestoreOptions);
-  logger.info({ msg: 'Firestore initialized' });
+  logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource });
 } catch (error) {
   logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
@@ -181,6 +186,7 @@ app.get('/_debug/config', (_req, res) => {
     gemini_configured: Boolean(process.env.GEMINI_API_KEY),
     sentry_configured: Boolean(process.env.SENTRY_DSN),
     env: process.env.NODE_ENV || 'development',
+    firestore_credential_source: firestoreCredentialSource,
   });
 });
 
