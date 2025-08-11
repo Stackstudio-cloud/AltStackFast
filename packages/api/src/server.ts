@@ -1,6 +1,8 @@
 import express from 'express';
 import { Firestore } from '@google-cloud/firestore';
-import { existsSync } from 'fs';
+import { existsSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join as pathJoin } from 'path';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -128,6 +130,7 @@ app.use('/v1/blueprint', blueprintLimiter);
 // Initialize Firestore with robust env handling
 let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
+let firestoreCredentialStrategy: string = 'none';
 try {
   let firestoreOptions: Record<string, unknown> = {};
   let usedCredentialEnvKey: string | null = null;
@@ -142,6 +145,7 @@ try {
       firestoreCredentialSource = `env-path:${key}`;
       usedCredentialEnvKey = key;
       // Leave options empty so ADC reads the file path
+      firestoreCredentialStrategy = 'path:existing';
       break;
     }
     // Try raw JSON
@@ -173,17 +177,31 @@ try {
     }
     if (parsed) {
       usedCredentialEnvKey = key;
-      // Prevent google-auth-library from treating env var as a file path
-      delete (process as any).env.GOOGLE_APPLICATION_CREDENTIALS;
-      firestoreOptions.credentials = parsed;
-      if (parsed.project_id && typeof parsed.project_id === 'string') {
-        (firestoreOptions as any).projectId = parsed.project_id;
+      // Write to a temp file and point google-auth to it to avoid env/path ambiguity
+      const keyFilePath = pathJoin(tmpdir(), 'gcp-service-account.json');
+      try {
+        writeFileSync(keyFilePath, JSON.stringify(parsed), { encoding: 'utf-8' });
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = keyFilePath;
+        firestoreCredentialStrategy = `path:written:${key}`;
+        // Prefer keyFilename to make intent explicit
+        (firestoreOptions as any).keyFilename = keyFilePath;
+        if (parsed.project_id && typeof parsed.project_id === 'string') {
+          (firestoreOptions as any).projectId = parsed.project_id;
+        }
+      } catch {
+        // Fallback to in-memory credentials if writing fails
+        delete (process as any).env.GOOGLE_APPLICATION_CREDENTIALS;
+        firestoreOptions.credentials = parsed;
+        if (parsed.project_id && typeof parsed.project_id === 'string') {
+          (firestoreOptions as any).projectId = parsed.project_id;
+        }
+        firestoreCredentialStrategy = `inline:${key}`;
       }
       break;
     }
   }
   firestore = new Firestore(firestoreOptions);
-  logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource, usedEnvKey: usedCredentialEnvKey });
+  logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource, strategy: firestoreCredentialStrategy, usedEnvKey: usedCredentialEnvKey });
 } catch (error) {
   logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
@@ -237,6 +255,7 @@ app.get('/_debug/config', (_req, res) => {
     sentry_configured: Boolean(process.env.SENTRY_DSN),
     env: process.env.NODE_ENV || 'development',
     firestore_credential_source: firestoreCredentialSource,
+    firestore_credential_strategy: firestoreCredentialStrategy,
     firestore_credential_env_keys_present: presentKeys,
   });
 });
