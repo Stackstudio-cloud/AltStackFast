@@ -131,6 +131,7 @@ app.use('/v1/blueprint', blueprintLimiter);
 let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
 let firestoreCredentialStrategy: string = 'none';
+let firestoreCredentialAttemptErrors: Array<{ key: string; stage: string; message: string }> = [];
 try {
   let firestoreOptions: Record<string, unknown> = {};
   let usedCredentialEnvKey: string | null = null;
@@ -157,20 +158,25 @@ try {
       } else {
         throw new Error('not-json');
       }
-    } catch {
+    } catch (err1) {
+      firestoreCredentialAttemptErrors.push({ key, stage: 'json', message: (err1 as Error)?.message || 'json-parse-failed' });
       // Try base64 → JSON (support url-safe variants)
       try {
-        const normalizedBase64 = raw.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        const compact = raw.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        const pad = (4 - (compact.length % 4)) % 4;
+        const normalizedBase64 = compact + '='.repeat(pad);
         const decoded = Buffer.from(normalizedBase64, 'base64').toString('utf-8');
         parsed = JSON.parse(decoded);
         firestoreCredentialSource = `env-base64:${key}`;
-      } catch {
+      } catch (err2) {
+        firestoreCredentialAttemptErrors.push({ key, stage: 'base64', message: (err2 as Error)?.message || 'base64-decode-failed' });
         // Try newline-normalized JSON
         try {
           const normalized = raw.replace(/\\n/g, '\n');
           parsed = JSON.parse(normalized);
           firestoreCredentialSource = `env-normalized-json:${key}`;
-        } catch {
+        } catch (err3) {
+          firestoreCredentialAttemptErrors.push({ key, stage: 'normalized-json', message: (err3 as Error)?.message || 'normalized-json-parse-failed' });
           // no-op; try next key
         }
       }
@@ -257,6 +263,7 @@ app.get('/_debug/config', (_req, res) => {
     firestore_credential_source: firestoreCredentialSource,
     firestore_credential_strategy: firestoreCredentialStrategy,
     firestore_credential_env_keys_present: presentKeys,
+    firestore_credential_attempt_errors: firestoreCredentialAttemptErrors,
   });
 });
 
