@@ -11,6 +11,17 @@ const Sentry = tryRequire('@sentry/node');
 const pino = tryRequire('pino');
 import rateLimit from 'express-rate-limit';
 
+// Helper to pick the first non-empty env var from a list
+const pickFirstEnv = (keys: string[]): { key: string; value: string } | null => {
+  for (const key of keys) {
+    const v = process.env[key];
+    if (typeof v === 'string' && v.trim().length > 0) {
+      return { key, value: v };
+    }
+  }
+  return null;
+};
+
 import { adminAuthMiddleware, assertProdSecrets } from './middleware/auth';
 import toolsRouter from './routes/tools';
 import analyzeRouter from './routes/analyze';
@@ -101,31 +112,40 @@ app.use('/v1/blueprint', blueprintLimiter);
 let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
 try {
-  const raw = process.env.GOOGLE_APPLICATION_CREDENTIALS?.trim();
+  const candidate = pickFirstEnv([
+    'GOOGLE_APPLICATION_CREDENTIALS_JSON',
+    'GOOGLE_APPLICATION_CREDENTIALS',
+    'GOOGLE_CREDENTIALS',
+    'GCP_SERVICE_ACCOUNT',
+    'GCP_CREDENTIALS',
+    'FIREBASE_SERVICE_ACCOUNT',
+    'FIREBASE_ADMIN_CREDENTIALS',
+  ]);
+  const raw = candidate?.value.trim();
   let firestoreOptions: Record<string, unknown> = {};
   if (raw) {
-    // If it's a path, let ADC pick it up
-    if (existsSync(raw)) {
+    // If it's a path, let ADC pick it up (only for GOOGLE_APPLICATION_CREDENTIALS)
+    if (candidate?.key === 'GOOGLE_APPLICATION_CREDENTIALS' && existsSync(raw)) {
       // Leave options empty; the library will read the file path from env
-      firestoreCredentialSource = 'env-path';
+      firestoreCredentialSource = `env-path:${candidate.key}`;
     } else {
       // Try raw JSON
       let parsed: any | null = null;
       try {
         parsed = JSON.parse(raw);
-        firestoreCredentialSource = 'env-json';
+        firestoreCredentialSource = `env-json:${candidate?.key}`;
       } catch {
         // Try base64 → JSON
         try {
           const decoded = Buffer.from(raw, 'base64').toString('utf-8');
           parsed = JSON.parse(decoded);
-          firestoreCredentialSource = 'env-base64';
+          firestoreCredentialSource = `env-base64:${candidate?.key}`;
         } catch {
           // Try newline-normalized JSON
           try {
             const normalized = raw.replace(/\\n/g, '\n');
             parsed = JSON.parse(normalized);
-            firestoreCredentialSource = 'env-normalized-json';
+            firestoreCredentialSource = `env-normalized-json:${candidate?.key}`;
           } catch {}
         }
       }
