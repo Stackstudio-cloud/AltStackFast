@@ -132,6 +132,7 @@ let firestore: Firestore | null = null;
 let firestoreCredentialSource: string = 'none';
 let firestoreCredentialStrategy: string = 'none';
 let firestoreCredentialAttemptErrors: Array<{ key: string; stage: string; message: string }> = [];
+let firestoreUsedCredentialEnvKey: string | null = null;
 try {
   let firestoreOptions: Record<string, unknown> = {};
   let usedCredentialEnvKey: string | null = null;
@@ -208,6 +209,7 @@ try {
   }
   firestore = new Firestore(firestoreOptions);
   logger.info({ msg: 'Firestore initialized', credentialSource: firestoreCredentialSource, strategy: firestoreCredentialStrategy, usedEnvKey: usedCredentialEnvKey });
+  firestoreUsedCredentialEnvKey = usedCredentialEnvKey;
 } catch (error) {
   logger.warn({ msg: 'Firestore initialization failed', err: (error as Error)?.message });
 }
@@ -253,6 +255,20 @@ app.get('/_debug/config', (_req, res) => {
     const v = process.env[k];
     return typeof v === 'string' && v.trim().length > 0;
   });
+  const valueHints: Record<string, { startsWithCurly: boolean; looksBase64ish: boolean; length: number }> = {};
+  for (const key of presentKeys) {
+    try {
+      const rawVal = process.env[key] as string;
+      const cleaned = cleanRawCredString(rawVal);
+      const trimmed = cleaned.trim();
+      const startsWithCurly = trimmed.startsWith('{');
+      // Heuristic only; do not expose content
+      const looksBase64ish = !startsWithCurly && /^[A-Za-z0-9+/_-]+=*$/.test(trimmed.replace(/\s+/g, ''));
+      valueHints[key] = { startsWithCurly, looksBase64ish, length: trimmed.length };
+    } catch {
+      // ignore
+    }
+  }
   res.json({
     success: true,
     node: process.version,
@@ -262,8 +278,10 @@ app.get('/_debug/config', (_req, res) => {
     env: process.env.NODE_ENV || 'development',
     firestore_credential_source: firestoreCredentialSource,
     firestore_credential_strategy: firestoreCredentialStrategy,
+    firestore_credential_used_env_key: firestoreUsedCredentialEnvKey,
     firestore_credential_env_keys_present: presentKeys,
     firestore_credential_attempt_errors: firestoreCredentialAttemptErrors,
+    firestore_env_value_hints: valueHints,
   });
 });
 
