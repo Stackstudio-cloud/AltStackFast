@@ -74,13 +74,43 @@ router.get('/', async (req, res) => {
     let total = 0;
 
     if (source === 'firestore' && firestore) {
-      // Firestore-backed listing with optional category filter; indexed order for cursor paging
-      let ref: FirebaseFirestore.Query = firestore.collection('tools')
-        .orderBy('last_updated', 'desc');
-      // Avoid composite index requirements by doing category filtering in-memory
-      if (cursor?.last_updated) ref = ref.startAfter(cursor.last_updated);
-      const snap = await ref.limit(limit).get();
-      let all: any[] = snap.docs.map((d) => d.data());
+      // Firestore-backed listing; be lenient with existing docs that may miss fields
+      const baseRef = firestore.collection('tools');
+      let snap: FirebaseFirestore.QuerySnapshot | null = await baseRef
+        .orderBy('last_updated', 'desc')
+        .limit(limit)
+        .get()
+        .catch(() => null);
+      // If ordering by last_updated yields no docs or fails (missing field), fallback to unordered
+      if (!snap || snap.empty) {
+        snap = await baseRef.limit(limit).get();
+      }
+      // Normalize docs to the schema shape (fill sensible defaults if missing)
+      let all: any[] = (snap?.docs || []).map((d: FirebaseFirestore.QueryDocumentSnapshot) => {
+        const raw: any = d.data() || {};
+        const toArray = (v: any): string[] => Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : []);
+        const normalized = {
+          tool_id: typeof raw.tool_id === 'string' && raw.tool_id ? raw.tool_id : d.id,
+          name: typeof raw.name === 'string' && raw.name ? raw.name : (typeof raw.tool_id === 'string' && raw.tool_id ? raw.tool_id : d.id),
+          description: typeof raw.description === 'string' ? raw.description : '',
+          category: toArray(raw.category),
+          last_updated: typeof raw.last_updated === 'string' ? raw.last_updated : new Date().toISOString(),
+          schema_version: typeof raw.schema_version === 'string' ? raw.schema_version : '2025-08-04',
+          // pass through optional known fields if present
+          notable_strengths: toArray(raw.notable_strengths),
+          known_limitations: toArray(raw.known_limitations),
+          output_types: toArray(raw.output_types),
+          integrations: toArray(raw.integrations),
+          license: typeof raw.license === 'string' ? raw.license : null,
+          maturity_score: typeof raw.maturity_score === 'number' ? raw.maturity_score : null,
+          popularity_score: typeof raw.popularity_score === 'number' ? raw.popularity_score : null,
+          requires_review: typeof raw.requires_review === 'boolean' ? raw.requires_review : false,
+          source_url: typeof raw.source_url === 'string' ? raw.source_url : undefined,
+          source_description: typeof raw.source_description === 'string' ? raw.source_description : undefined,
+          scraping_failed: typeof raw.scraping_failed === 'boolean' ? raw.scraping_failed : undefined,
+        };
+        return normalized;
+      });
       if (category) all = all.filter((t) => Array.isArray(t.category) && t.category.includes(category));
       if (q) all = all.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
       if (typeof requiresReview === 'boolean') all = all.filter((t) => Boolean(t.requires_review) === requiresReview);
