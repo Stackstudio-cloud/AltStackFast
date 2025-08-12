@@ -76,12 +76,12 @@ router.get('/', async (req, res) => {
     if (source === 'firestore' && firestore) {
       // Firestore-backed listing with optional category filter; indexed order for cursor paging
       let ref: FirebaseFirestore.Query = firestore.collection('tools')
-        .orderBy('last_updated', 'desc')
-        .orderBy('tool_id');
-      if (category) ref = ref.where('category', 'array-contains', category);
-      if (cursor?.last_updated) ref = ref.startAfter(cursor.last_updated, cursor.tool_id || '');
+        .orderBy('last_updated', 'desc');
+      // Avoid composite index requirements by doing category filtering in-memory
+      if (cursor?.last_updated) ref = ref.startAfter(cursor.last_updated);
       const snap = await ref.limit(limit).get();
       let all: any[] = snap.docs.map((d) => d.data());
+      if (category) all = all.filter((t) => Array.isArray(t.category) && t.category.includes(category));
       if (q) all = all.filter((t) => `${t.name} ${t.description}`.toLowerCase().includes(q));
       if (typeof requiresReview === 'boolean') all = all.filter((t) => Boolean(t.requires_review) === requiresReview);
       // Use counters doc for accurate total if present
@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
 
     const last = validatedTools[validatedTools.length - 1];
     const nextCursor = last?.last_updated
-      ? Buffer.from(JSON.stringify({ last_updated: last.last_updated, tool_id: last.tool_id })).toString('base64')
+      ? Buffer.from(JSON.stringify({ last_updated: last.last_updated })).toString('base64')
       : undefined;
 
     res.status(200).json({
